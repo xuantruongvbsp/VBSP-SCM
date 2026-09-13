@@ -7,6 +7,7 @@ Dùng SQLite in-memory để tránh phụ thuộc file DB thật.
 from __future__ import annotations
 
 import sqlite3
+import importlib
 from unittest.mock import patch, MagicMock
 
 import pandas as pd
@@ -137,6 +138,48 @@ def db_memory():
         )
     """)
     conn.execute("""
+        CREATE TABLE thon_snapshot (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ky TEXT NOT NULL,
+            ten_pgd TEXT NOT NULL DEFAULT '',
+            ma_thon TEXT NOT NULL DEFAULT '',
+            ten_xa TEXT NOT NULL,
+            ten_thon TEXT NOT NULL,
+            tong_du_no REAL NOT NULL DEFAULT 0,
+            du_no_th REAL NOT NULL DEFAULT 0,
+            du_no_qh REAL NOT NULL DEFAULT 0,
+            cho_vay_thang REAL NOT NULL DEFAULT 0,
+            thu_no_thang REAL NOT NULL DEFAULT 0,
+            cho_vay_nam REAL NOT NULL DEFAULT 0,
+            thu_no_nam REAL NOT NULL DEFAULT 0,
+            no_den_han_mon INTEGER NOT NULL DEFAULT 0,
+            no_den_han_goc REAL NOT NULL DEFAULT 0,
+            so_mon_3m_khd INTEGER NOT NULL DEFAULT 0,
+            so_mon_rui_ro INTEGER NOT NULL DEFAULT 0,
+            ngay_so_lieu TEXT,
+            created_by TEXT DEFAULT 'system',
+            created_at TEXT DEFAULT (datetime('now')),
+            UNIQUE(ky, ten_pgd, ma_thon, ten_xa, ten_thon)
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE cbtd_to_tkvv_snapshot (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ky TEXT NOT NULL,
+            ma_cb TEXT NOT NULL,
+            ho_ten TEXT NOT NULL DEFAULT '',
+            pgd TEXT NOT NULL DEFAULT '',
+            so_to INTEGER NOT NULL DEFAULT 0,
+            so_tot INTEGER NOT NULL DEFAULT 0,
+            so_kha INTEGER NOT NULL DEFAULT 0,
+            so_tb INTEGER NOT NULL DEFAULT 0,
+            so_yeu INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            created_by TEXT NOT NULL DEFAULT 'system',
+            UNIQUE(ky, ma_cb)
+        )
+    """)
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS audit_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             ts TEXT,
@@ -168,8 +211,9 @@ class TestKyTuDf:
         assert svc._ky_tu_df(df) == "2026-03"
 
     def test_ngay_dang_iso(self):
-        df = pd.DataFrame({"Ngày số liệu": ["2026-03-31"]})
-        assert svc._ky_tu_df(df) == "2026-03"
+        df = pd.DataFrame({"Ngày số liệu": ["2026-07-01"]})
+        assert svc._ky_tu_df(df) == "2026-07"
+        assert svc._ngay_so_lieu_max(df) == "01/07/2026"
 
     def test_khong_co_cot(self):
         """Không có cột Ngày số liệu → fallback tháng hiện tại."""
@@ -187,6 +231,73 @@ class TestKyTuDf:
         df = pd.DataFrame({"Ngày số liệu": ["31/03/2026", "30/04/2026"]})
         assert svc._ky_tu_df(df) == "2026-04"
         assert svc._ngay_so_lieu_max(df) == "30/04/2026"
+
+
+class TestKyThangTruoc:
+    def test_thang_lien_truoc_chinh_xac(self):
+        ds = ["2026-05", "2026-04", "2026-03", "2025-12"]
+        assert svc.ky_thang_truoc(ds, "2026-05") == "2026-04"
+
+    def test_thang_truoc_khi_qua_nam(self):
+        ds = ["2026-01", "2025-12", "2025-11"]
+        assert svc.ky_thang_truoc(ds, "2026-01") == "2025-12"
+
+    def test_thieu_thang_lien_truoc_tra_none(self):
+        ds = ["2026-05", "2026-02", "2026-01"]
+        assert svc.ky_thang_truoc(ds, "2026-05") is None
+
+    def test_danh_sach_rong(self):
+        assert svc.ky_thang_truoc([], "2026-05") is None
+
+    def test_ky_khong_hop_le(self):
+        assert svc.ky_thang_truoc(["2026-05"], "abc") is None
+        assert svc.ky_thang_truoc(["2025-12"], "2026-00") is None
+        assert svc.ky_thang_truoc(["2026-02"], "2026-03-extra") is None
+
+    def test_khong_co_ky_truoc_tra_none(self):
+        assert svc.ky_thang_truoc(["2026-05"], "2026-05") is None
+
+
+class TestNgayCuoiThang:
+    def test_thang_31_ngay(self):
+        assert svc.ngay_cuoi_thang("2026-03") == "31/03/2026"
+
+    def test_thang_30_ngay(self):
+        assert svc.ngay_cuoi_thang("2026-04") == "30/04/2026"
+
+    def test_thang_2_nam_nhuan(self):
+        assert svc.ngay_cuoi_thang("2024-02") == "29/02/2024"
+
+    def test_ky_khong_hop_le(self):
+        assert svc.ngay_cuoi_thang("abc") is None
+
+    def test_ky_thua_thanh_phan_khong_hop_le(self):
+        assert svc.ngay_cuoi_thang("2026-03-15") is None
+
+    def test_luu_snapshot_giu_ngay_so_lieu_thuc_te(self, db_memory):
+        df = pd.DataFrame({
+            "Tên PGD": ["PGD Biên Hòa"],
+            "Mã KH": ["KH001"],
+            "Số khế ước": ["KU001"],
+            "Tổng dư nợ": [10_000_000.0],
+            "Dư nợ trong hạn": [10_000_000.0],
+            "Dư nợ quá hạn": [0.0],
+            "Dư nợ khoanh": [0.0],
+            "Mã chương trình": ["2"],
+            "Nguồn vốn": ["1"],
+            "Ngày số liệu": ["15/03/2026"],
+        })
+        svc.luu_snapshot(df, "tester")
+        row = db_memory.execute(
+            "SELECT ngay_so_lieu FROM hstd_snapshot WHERE ten_pgd='__CN__'"
+        ).fetchone()
+        assert row["ngay_so_lieu"] == "15/03/2026"
+
+    def test_snapshot_la_cuoi_thang(self):
+        df_ok = pd.DataFrame({"ngay_so_lieu": ["30/04/2026", "30/04/2026"]})
+        df_sai = pd.DataFrame({"ngay_so_lieu": ["29/04/2026"]})
+        assert svc.snapshot_la_cuoi_thang(df_ok, "2026-04") is True
+        assert svc.snapshot_la_cuoi_thang(df_sai, "2026-04") is False
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -225,6 +336,69 @@ class TestLuuSnapshot:
             "SELECT COUNT(*) FROM hstd_snapshot WHERE ten_pgd='__CN__'"
         ).fetchone()[0]
         assert count == 1  # upsert, không duplicate
+
+    def test_luu_lai_cung_ky_xoa_dong_chi_tiet_khong_con(self, df_hstd_gias, db_memory):
+        svc.luu_snapshot(df_hstd_gias, "user1")
+        df_moi = df_hstd_gias.iloc[[0]].copy()
+
+        kq = svc.luu_snapshot(df_moi, "user2")
+
+        assert kq.thanh_cong is True
+        rows = db_memory.execute(
+            "SELECT ten_pgd, ma_ct, nguon_von FROM hstd_snapshot WHERE ky='2026-03'"
+        ).fetchall()
+        assert {(r["ten_pgd"], r["ma_ct"], r["nguon_von"]) for r in rows} == {
+            ("PGD Biên Hòa", "2", "1"),
+            ("PGD Biên Hòa", "ALL", "ALL"),
+            ("__CN__", "ALL", "ALL"),
+        }
+
+    def test_luu_ngay_so_lieu_theo_tung_pgd_de_phat_hien_file_giua_thang(
+        self, df_hstd_gias, db_memory
+    ):
+        df = df_hstd_gias.iloc[[0, 2]].copy()
+        df.loc[df["Tên PGD"].eq("PGD Biên Hòa"), "Ngày số liệu"] = "31/03/2026"
+        df.loc[df["Tên PGD"].eq("PGD Long Khánh"), "Ngày số liệu"] = "23/03/2026"
+
+        svc.luu_snapshot(df, "user1")
+        snap = svc.doc_snapshot("2026-03")
+
+        ngay_theo_pgd = snap.set_index("ten_pgd")["ngay_so_lieu"].to_dict()
+        assert ngay_theo_pgd["PGD Biên Hòa"] == "31/03/2026"
+        assert ngay_theo_pgd["PGD Long Khánh"] == "23/03/2026"
+        assert svc.snapshot_la_cuoi_thang(snap, "2026-03") is False
+
+    def test_luu_lai_cung_ky_rollback_neu_insert_loi(self, df_hstd_gias, db_memory):
+        svc.luu_snapshot(df_hstd_gias, "user1")
+        count_truoc = db_memory.execute(
+            "SELECT COUNT(*) FROM hstd_snapshot WHERE ky='2026-03'"
+        ).fetchone()[0]
+        db_memory.execute("""
+            CREATE TRIGGER fail_hstd_insert
+            BEFORE INSERT ON hstd_snapshot
+            WHEN NEW.ma_ct = '4'
+            BEGIN
+                SELECT RAISE(ABORT, 'forced insert failure');
+            END
+        """)
+        db_memory.commit()
+
+        kq = svc.luu_snapshot(df_hstd_gias, "user2")
+
+        assert kq.thanh_cong is False
+        count_sau = db_memory.execute(
+            "SELECT COUNT(*) FROM hstd_snapshot WHERE ky='2026-03'"
+        ).fetchone()[0]
+        assert count_sau == count_truoc
+
+    def test_cho_phep_truyen_ky_tuong_minh(self, df_hstd_gias, db_memory):
+        df_baseline = df_hstd_gias.copy()
+        df_baseline["Ngày số liệu"] = "31/12/2025"
+        kq = svc.luu_snapshot(df_baseline, "user1", ky="2025-12")
+        assert kq.thanh_cong is True
+        assert db_memory.execute(
+            "SELECT COUNT(*) FROM hstd_snapshot WHERE ky='2025-12'"
+        ).fetchone()[0] > 0
 
     def test_df_rong_tra_false(self, db_memory):
         kq = svc.luu_snapshot(pd.DataFrame(), "test_user")
@@ -445,6 +619,193 @@ class TestDanhSachKy:
         assert ds[0] > ds[-1]  # mới nhất ở đầu
 
 
+class TestThonSnapshot:
+    @staticmethod
+    def _tong_hop(*rows: dict) -> pd.DataFrame:
+        return pd.DataFrame(rows)
+
+    def test_luu_doc_giu_dinh_danh_va_ngay_tung_thon(self, db_memory):
+        raw = pd.DataFrame({"Ngày số liệu": ["31/03/2026"]})
+        tong_hop = self._tong_hop({
+            "Ten_pgd": "PGD A", "Ma_thon": "101", "Ten_xa": "Xã A", "Ten_thon": "Thôn 1",
+            "Tong_du_no": 10_000_000, "Du_no_th": 9_000_000, "Du_no_qh": float("nan"),
+            "Cho_vay_thang": 2_000_000, "Thu_no_thang": 1_000_000,
+            "Cho_vay_nam": 4_000_000, "Thu_no_nam": 3_000_000,
+            "No_den_han_mon": 1, "No_den_han_goc": 3_000_000,
+            "So_mon_3m_khd": 0, "So_mon_rui_ro": 1, "Ngay_so_lieu": "31/03/2026",
+        })
+        with patch(
+            "services.cbtd_dia_ban_service.tong_hop_hstd_theo_thon",
+            return_value=tong_hop,
+        ):
+            result = svc.luu_thon_snapshot(raw, "tester", ky="2026-03")
+
+        assert result.thanh_cong is True
+        doc = svc.doc_thon_snapshot("2026-03")
+        assert doc.loc[0, "ten_pgd"] == "PGD A"
+        assert doc.loc[0, "ma_thon"] == "101"
+        assert doc.loc[0, "du_no_th"] == 9_000_000
+        assert doc.loc[0, "du_no_qh"] == 0
+        assert doc.loc[0, "cho_vay_nam"] == 4_000_000
+        assert doc.loc[0, "thu_no_nam"] == 3_000_000
+        assert doc.loc[0, "ngay_so_lieu"] == "31/03/2026"
+
+    def test_luu_lai_cung_ky_xoa_thon_khong_con(self, db_memory):
+        raw = pd.DataFrame({"Ngày số liệu": ["31/03/2026"]})
+        base = {
+            "Ten_pgd": "PGD A", "Ma_thon": "101", "Ten_xa": "Xã A", "Ten_thon": "Thôn 1",
+            "Tong_du_no": 1, "Du_no_qh": 0, "Cho_vay_thang": 0, "Thu_no_thang": 0,
+            "No_den_han_mon": 0, "No_den_han_goc": 0, "So_mon_3m_khd": 0,
+            "So_mon_rui_ro": 0, "Ngay_so_lieu": "31/03/2026",
+        }
+        first = self._tong_hop(base, {**base, "Ma_thon": "102", "Ten_thon": "Thôn 2"})
+        second = self._tong_hop(base)
+        with patch(
+            "services.cbtd_dia_ban_service.tong_hop_hstd_theo_thon",
+            side_effect=[first, second],
+        ):
+            assert svc.luu_thon_snapshot(raw, "u1", ky="2026-03").thanh_cong
+            assert svc.luu_thon_snapshot(raw, "u2", ky="2026-03").thanh_cong
+
+        rows = db_memory.execute(
+            "SELECT ma_thon FROM thon_snapshot WHERE ky='2026-03'"
+        ).fetchall()
+        assert [r["ma_thon"] for r in rows] == ["101"]
+
+    def test_luu_lai_rollback_neu_insert_loi(self, db_memory):
+        raw = pd.DataFrame({"Ngày số liệu": ["31/03/2026"]})
+        good = self._tong_hop({
+            "Ten_pgd": "PGD A", "Ma_thon": "101", "Ten_xa": "Xã A", "Ten_thon": "Thôn 1",
+            "Tong_du_no": 1, "Ngay_so_lieu": "31/03/2026",
+        })
+        bad = self._tong_hop({
+            "Ten_pgd": "PGD A", "Ma_thon": "999", "Ten_xa": "Xã A", "Ten_thon": "FAIL",
+            "Tong_du_no": 2, "Ngay_so_lieu": "31/03/2026",
+        })
+        with patch(
+            "services.cbtd_dia_ban_service.tong_hop_hstd_theo_thon",
+            return_value=good,
+        ):
+            assert svc.luu_thon_snapshot(raw, "u1", ky="2026-03").thanh_cong
+        db_memory.execute("""
+            CREATE TRIGGER fail_thon_insert BEFORE INSERT ON thon_snapshot
+            WHEN NEW.ten_thon = 'FAIL'
+            BEGIN SELECT RAISE(ABORT, 'forced insert failure'); END
+        """)
+        db_memory.commit()
+
+        with patch(
+            "services.cbtd_dia_ban_service.tong_hop_hstd_theo_thon",
+            return_value=bad,
+        ):
+            result = svc.luu_thon_snapshot(raw, "u2", ky="2026-03")
+
+        assert result.thanh_cong is False
+        row = db_memory.execute(
+            "SELECT ma_thon, tong_du_no FROM thon_snapshot WHERE ky='2026-03'"
+        ).fetchone()
+        assert (row["ma_thon"], row["tong_du_no"]) == ("101", 1)
+
+    def test_export_thon_snapshot(self, db_memory):
+        db_memory.execute(
+            """INSERT INTO thon_snapshot
+               (ky, ten_pgd, ma_thon, ten_xa, ten_thon, ngay_so_lieu)
+               VALUES ('2026-03', 'PGD A', '101', 'Xã A', 'Thôn 1', '31/03/2026')"""
+        )
+        db_memory.commit()
+        assert svc.export_snapshot_excel(["2026-03"], "thon")[:2] == b"PK"
+
+
+class TestThonSnapshotMigration:
+    def test_nang_schema_bao_toan_du_lieu_va_khong_xoa_cbtd_cu(self):
+        conn = sqlite3.connect(":memory:")
+        conn.execute("""
+            CREATE TABLE thon_snapshot (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, ky TEXT NOT NULL,
+                ten_xa TEXT NOT NULL, ten_thon TEXT NOT NULL,
+                tong_du_no REAL NOT NULL DEFAULT 0, du_no_qh REAL NOT NULL DEFAULT 0,
+                cho_vay_thang REAL NOT NULL DEFAULT 0, thu_no_thang REAL NOT NULL DEFAULT 0,
+                no_den_han_mon INTEGER NOT NULL DEFAULT 0, no_den_han_goc REAL NOT NULL DEFAULT 0,
+                so_mon_3m_khd INTEGER NOT NULL DEFAULT 0, so_mon_rui_ro INTEGER NOT NULL DEFAULT 0,
+                ngay_so_lieu TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                created_by TEXT NOT NULL DEFAULT 'system', UNIQUE(ky, ten_xa, ten_thon)
+            )
+        """)
+        conn.execute("CREATE TABLE cbtd_snapshot (id INTEGER PRIMARY KEY, ky TEXT)")
+        conn.execute(
+            "INSERT INTO thon_snapshot (ky, ten_xa, ten_thon, tong_du_no) VALUES ('2026-03','Xã A','Thôn 1',123)"
+        )
+        conn.commit()
+
+        importlib.import_module("migrations.004_ensure_thon_snapshot").upgrade(conn)
+        assert conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='cbtd_snapshot'"
+        ).fetchone()
+        importlib.import_module("migrations.005_thon_snapshot_identity").upgrade(conn)
+
+        columns = {r[1] for r in conn.execute("PRAGMA table_info(thon_snapshot)")}
+        row = conn.execute(
+            "SELECT ten_pgd, ma_thon, ten_xa, ten_thon, tong_du_no FROM thon_snapshot"
+        ).fetchone()
+        assert {"ten_pgd", "ma_thon"}.issubset(columns)
+        assert row[0] in {"", "__UNKNOWN__"}
+        assert row[1:] == ("", "Xã A", "Thôn 1", 123)
+        conn.close()
+
+    def test_migration_006_them_chi_tieu_va_bang_cbtd_to_tkvv_idempotent(self):
+        conn = sqlite3.connect(":memory:")
+        conn.execute("""
+            CREATE TABLE thon_snapshot (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ky TEXT NOT NULL,
+                ten_pgd TEXT NOT NULL DEFAULT '',
+                ma_thon TEXT NOT NULL DEFAULT '',
+                ten_xa TEXT NOT NULL,
+                ten_thon TEXT NOT NULL,
+                tong_du_no REAL NOT NULL DEFAULT 0,
+                du_no_qh REAL NOT NULL DEFAULT 0
+            )
+        """)
+        migration = importlib.import_module("migrations.006_cbtd_comparison")
+
+        migration.upgrade(conn)
+        migration.upgrade(conn)
+
+        columns = {r[1] for r in conn.execute("PRAGMA table_info(thon_snapshot)")}
+        assert {"du_no_th", "cho_vay_nam", "thu_no_nam"}.issubset(columns)
+        assert conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='cbtd_to_tkvv_snapshot'"
+        ).fetchone()
+        conn.close()
+
+
+class TestCbtdToTkvvSnapshot:
+    def test_luu_doc_khu_trung_to_va_dem_xep_loai(self, db_memory):
+        df_cdtot = pd.DataFrame([
+            {"ten_dv": "PGD A", "ten_xa": "Xã A", "ma_to": "T01", "xep_loai": "Tốt"},
+            {"ten_dv": "PGD A", "ten_xa": "Xã A", "ma_to": "T01", "xep_loai": "Tốt"},
+            {"ten_dv": "PGD A", "ten_xa": "Xã A", "ma_to": "T02", "xep_loai": "Khá"},
+        ])
+        cbtd_data = {
+            "CB01": {"ho_ten": "Nguyễn Văn A", "pgd": "PGD A", "ds_dgd": ["ĐGD A"]},
+        }
+        dgd_map = {
+            "PGD A": {"Xã A": {"ĐGD A": {"thon": ["Thôn 1"]}}},
+        }
+
+        result = svc.luu_cbtd_to_tkvv_snapshot(
+            df_cdtot, cbtd_data, dgd_map, "2026-03", "tester"
+        )
+        doc = svc.doc_cbtd_to_tkvv_snapshot("2026-03")
+
+        assert result.thanh_cong is True
+        assert len(doc) == 1
+        assert doc.loc[0, "ma_cb"] == "CB01"
+        assert doc.loc[0, "so_to"] == 2
+        assert doc.loc[0, "so_tot"] == 1
+        assert doc.loc[0, "so_kha"] == 1
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # TEST xoa_snapshot
 # ══════════════════════════════════════════════════════════════════════════════
@@ -455,7 +816,7 @@ class TestXoaSnapshot:
         ds = svc.danh_sach_ky()
         assert "2026-03" not in ds
 
-    def test_xoa_dong_bo_ca_5_bang(self, df_hstd_gias, db_memory):
+    def test_xoa_dong_bo_tat_ca_bang(self, df_hstd_gias, db_memory):
         svc.luu_snapshot(df_hstd_gias, "test_user")
         db_memory.execute(
             "INSERT INTO uy_thac_snapshot (ky, cap_tong_hop, ten_pgd) VALUES (?, ?, ?)",
@@ -463,11 +824,28 @@ class TestXoaSnapshot:
         )
         for table in ("nq11_snapshot", "gqvl_snapshot", "cdtotkvv_snapshot"):
             db_memory.execute(f"INSERT INTO {table} (ky, ten_pgd) VALUES (?, ?)", ("2026-03", "__CN__"))
+        db_memory.execute(
+            """INSERT INTO thon_snapshot
+               (ky, ten_pgd, ma_thon, ten_xa, ten_thon) VALUES (?, ?, ?, ?, ?)""",
+            ("2026-03", "PGD A", "101", "Xã A", "Thôn 1"),
+        )
+        db_memory.execute(
+            "INSERT INTO cbtd_to_tkvv_snapshot (ky, ma_cb) VALUES (?, ?)",
+            ("2026-03", "CB01"),
+        )
         db_memory.commit()
 
         svc.xoa_snapshot("2026-03", "test_user")
 
-        for table in ("hstd_snapshot", "uy_thac_snapshot", "nq11_snapshot", "gqvl_snapshot", "cdtotkvv_snapshot"):
+        for table in (
+            "hstd_snapshot",
+            "uy_thac_snapshot",
+            "nq11_snapshot",
+            "gqvl_snapshot",
+            "cdtotkvv_snapshot",
+            "cbtd_to_tkvv_snapshot",
+            "thon_snapshot",
+        ):
             count = db_memory.execute(f"SELECT COUNT(*) FROM {table} WHERE ky='2026-03'").fetchone()[0]
             assert count == 0
 

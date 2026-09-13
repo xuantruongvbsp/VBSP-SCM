@@ -106,6 +106,31 @@ def main() -> None:
     canh_bao: list[str] = []
     chua_xd_ngay_trung: list[dict] = []
 
+    # Ngày "chính" của mỗi mã thôn = ngày GDXA của các dòng CÓ dư nợ.
+    # Dòng dư nợ 0 là hồ sơ tất toán, Ngày GDXA cũ không còn phản ánh Điểm GD hiện tại
+    # (vd: 46005812 có dòng 0đ ngày 13 nhưng dư nợ thật nằm ở ngày 22).
+    ngay_chinh: dict[tuple[str, str], set] = {}
+    ngay_dong_0: dict[tuple[str, str], set] = {}
+    for (xa, mt, ngay), g in d.groupby(["_xa", "_mt", "_ngay"], dropna=False):
+        key = (xa, mt)
+        if float(g["_dn"].sum()) > 0 and not pd.isna(ngay):
+            ngay_chinh.setdefault(key, set()).add(int(ngay))
+        elif pd.isna(ngay):
+            ngay_dong_0.setdefault(key, set()).add(None)
+        else:
+            ngay_dong_0.setdefault(key, set()).add(int(ngay))
+
+    def _ma_thon_cua_ngay(xa: str, ngay: int) -> tuple[list[str], list[str]]:
+        """(mã thôn có dư nợ đúng ngày này, mã thôn chỉ có dòng 0đ ghi ngày này)."""
+        chinh, mo = [], []
+        for (x, mt), ds_n in ngay_chinh.items():
+            if x == xa and ds_n == {ngay}:
+                chinh.append(mt)
+        for (x, mt), ds_n in ngay_dong_0.items():
+            if x == xa and ngay_chinh.get((x, mt)) is None and ds_n == {ngay}:
+                mo.append(mt)
+        return sorted(chinh), sorted(mo)
+
     for xa, ds_dgd in PDF_DGD.items():
         ket_qua[xa] = {}
         g_xa = d[d["_xa"] == xa]
@@ -115,13 +140,15 @@ def main() -> None:
         theo_ngay: dict[int, tuple] = {}
         for ngay in ds_ngay:
             g_n = g_xa[g_xa["_ngay"] == ngay]
-            theo_ngay[ngay] = (_metrics(g_n), sorted(g_n["_mt"].unique()))
+            ma_chinh, ma_mo = _ma_thon_cua_ngay(xa, ngay)
+            theo_ngay[ngay] = (_metrics(g_n), ma_chinh, ma_mo)
 
         con_lai_dgd = list(ds_dgd)
 
         # Lượt 1 — khớp 1-1 duy nhất
         for ngay in ds_ngay:
-            m_n, ma_thons = theo_ngay[ngay]
+            m_n, ma_chinh, ma_mo = theo_ngay[ngay]
+            ma_thons = ma_chinh + ma_mo
             khang = [x for x in con_lai_dgd if _khop(m_n, (x[1], x[2], x[3]))]
             if len(khang) != 1:
                 continue
@@ -140,7 +167,8 @@ def main() -> None:
                 continue
             if not con_lai_dgd:
                 break
-            m_n, ma_thons = theo_ngay[ngay]
+            m_n, ma_chinh, ma_mo = theo_ngay[ngay]
+            ma_thons = ma_chinh + ma_mo
             tong_pdf = (sum(x[1] for x in con_lai_dgd), sum(x[2] for x in con_lai_dgd),
                         round(sum(x[3] for x in con_lai_dgd), 2))
             if len(con_lai_dgd) == 1 and _khop(m_n, (con_lai_dgd[0][1], con_lai_dgd[0][2], con_lai_dgd[0][3])):
@@ -161,8 +189,8 @@ def main() -> None:
                 continue
 
             g_n = g_xa[g_xa["_ngay"] == ngay]
-            ma_thon_co_du_no = sorted(g_n.loc[g_n["_dn"] > 0, "_mt"].unique())
-            ma_thon_du_no_0 = [m for m in ma_thons if m not in ma_thon_co_du_no]
+            ma_thon_co_du_no = ma_chinh
+            ma_thon_du_no_0 = ma_mo
             per_mt = {mt: _metrics(g_n[g_n["_mt"] == mt]) for mt in ma_thon_co_du_no}
             ds_loi_giai = _tach_tap_con(ma_thon_co_du_no, per_mt, con_lai_dgd, tim_tat_ca=True)
             if not ds_loi_giai:

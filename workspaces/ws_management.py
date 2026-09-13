@@ -351,6 +351,7 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
         {"group": "Báo cáo", "label": "⏰ Nợ Đến Hạn",           "icon": "clock",         "fn": lambda: _get_tab("tab_den_han").render(None, role=role, username=username, df_full=df_full)},
         {"group": "Báo cáo", "label": "📅 Báo cáo định kỳ",      "icon": "calendar",      "fn": lambda: _get_tab("tab_quan_ly_bc").render(None, **kwargs)},
         {"group": "Báo cáo", "label": "📄 Báo cáo KHNV",         "icon": "file-report",   "fn": lambda: _get_tab("tab_khnv_bao_cao").render(None, **kwargs)},
+        {"group": "Báo cáo", "label": "📊 Báo cáo Chất lượng tín dụng", "icon": "bar-chart-2","fn": lambda: _get_tab("tab_mau03_khnv").render(None, **kwargs)},
         {"group": "Báo cáo", "label": "📋 Theo dõi nhập liệu",   "icon": "clipboard-list","fn": lambda: _get_tab("tab_theo_doi_nhap").render(None, **kwargs)},
 
         # ── Giám sát ───────────────────────────────────────────────────────────
@@ -416,6 +417,15 @@ def _normalize_active_label(all_items: list, active_label: str | None) -> str | 
     return active_label
 
 
+def _restore_saved_menu_once(username: str, all_items: list) -> str | None:
+    """Đọc menu đã lưu đúng một lần mỗi session để tránh đánh DB khi đổi tab."""
+    loaded_key = f"_nav_ws_mgmt_loaded_{username}"
+    if st.session_state.get(loaded_key):
+        return None
+    st.session_state[loaded_key] = True
+    return _normalize_active_label(all_items, db.doc_kv(f"nav_ws_mgmt_{username}"))
+
+
 def render_sidebar_menu(role: str, username: str, **kwargs):
     """Render menu ĐIỀU HÀNH — gọi từ app.py bên trong with st.sidebar.
     Tối ưu: dùng st.radio() theo nhóm thay cho ~25 st.button() riêng lẻ."""
@@ -444,8 +454,9 @@ def render_sidebar_menu(role: str, username: str, **kwargs):
     active_label = state.nav_ws_mgmt_menu
     active_label = _normalize_active_label(all_items, active_label)
     if active_label not in valid_labels:
-        state.nav_ws_mgmt_menu = default_label
-        active_label = default_label
+        saved_label = _restore_saved_menu_once(username, all_items)
+        active_label = saved_label if saved_label in valid_labels else default_label
+        state.nav_ws_mgmt_menu = active_label
     if active_label != state.nav_ws_mgmt_menu:
         state.nav_ws_mgmt_menu = active_label
 
@@ -605,10 +616,8 @@ def render(**kwargs):
     # Khởi tạo / validate ws_mgmt_menu — khôi phục từ kv_store nếu session mới
     active_label = state.nav_ws_mgmt_menu
     active_label = _normalize_active_label(ALL_ITEMS, active_label)
-    _mem_key = f"nav_ws_mgmt_{username}"
     if not active_label or active_label not in valid_labels:
-        _saved = db.doc_kv(_mem_key)
-        _saved = _normalize_active_label(ALL_ITEMS, _saved)
+        _saved = _restore_saved_menu_once(username, ALL_ITEMS)
         if _saved and _saved in valid_labels:
             active_label = _saved
         else:
@@ -616,11 +625,6 @@ def render(**kwargs):
         state.nav_ws_mgmt_menu = active_label
     if active_label != state.nav_ws_mgmt_menu:
         state.nav_ws_mgmt_menu = active_label
-
-    _prev_saved = db.doc_kv(_mem_key)
-    if _prev_saved != active_label:
-        db.ghi_kv(_mem_key, active_label, username)
-        db.ghi_audit(username, "luu_nav_ws_mgmt", f"Lưu menu điều hành: {active_label}")
 
     # ── Render DUY NHẤT mục đang chọn ────────────────────────────────────
     active_item = next((x for x in ALL_ITEMS if x["label"] == active_label), None)

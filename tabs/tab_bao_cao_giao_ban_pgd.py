@@ -15,6 +15,7 @@ from config import (
 )
 from auth import is_pgd_role, is_cn_role
 from data import danh_dau_khong_hd_cached
+from data.dgd_helpers import ds_ma_thon_cua_entry, ds_thon_cua_entry
 from utils import fmt_ty, fmt_so, hien_thi_dataframe_phan_trang
 from services.excel_service import xuat_excel_chuyen_nghiep
 from pdf_service import kiem_tra_pdf_dependency
@@ -179,25 +180,41 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
 
             chon_dgd = st.selectbox("📍 Điểm giao dịch", ds_dgd, key="op_gb_dgd")
 
-            ds_thon_dgd = dgd_map[current_pgd][chon_xa][chon_dgd]
+            entry_dgd = dgd_map[current_pgd][chon_xa][chon_dgd]
+
+            ds_thon_dgd = ds_thon_cua_entry(entry_dgd)
+
+            ds_ma_dgd = ds_ma_thon_cua_entry(entry_dgd)
 
             ten_dgd = chon_dgd
 
-            st.caption(f"Quản lý: {', '.join(ds_thon_dgd)}")
+            st.caption(f"Quản lý: {', '.join(ds_thon_dgd) if ds_thon_dgd else '(theo mã thôn)'}")
 
             
 
-            # Lọc df theo thôn/ấp của điểm giao dịch
+            # Lọc df theo thôn/ấp (tên) hoặc mã thôn của điểm giao dịch
+
+            mask_thon = pd.Series(False, index=df_xa.index)
 
             if "Tên thôn" in df_xa.columns:
 
-                df_dgd = df_xa[df_xa["Tên thôn"].isin(ds_thon_dgd)].copy()
+                mask_thon = df_xa["Tên thôn"].isin(ds_thon_dgd)
+
+            if ds_ma_dgd and "Mã thôn" in df_xa.columns:
+
+                ma_s = (df_xa["Mã thôn"].astype("string").fillna("")
+                        .str.strip().str.replace(r"\.0$", "", regex=True))
+                mask_thon = mask_thon | ma_s.isin(ds_ma_dgd)
+
+            if mask_thon.any() or ds_thon_dgd or ds_ma_dgd:
+
+                df_dgd = df_xa[mask_thon].copy()
 
             else:
 
                 df_dgd = df_xa.copy()
 
-                st.warning("Không tìm thấy cột 'Tên thôn' để lọc theo điểm giao dịch.")
+                st.warning("Không tìm thấy cột 'Tên thôn'/'Mã thôn' để lọc theo điểm giao dịch.")
 
         
 

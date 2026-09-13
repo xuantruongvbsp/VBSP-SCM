@@ -1,5 +1,220 @@
 # CHANGELOG
 
+## [2026-09-13] — Bổ sung smoke test cho Dashboard CBTD & Địa bàn
+- `tests/test_smoke_imports.py` — Đưa `tabs.tab_cbtd_dashboard` vào danh sách kiểm tra import và gọi `render()` để phát hiện sớm lỗi runtime sau thay đổi UI.
+
+## [2026-09-13] — Dashboard CBTD & Địa bàn: bỏ expander "⚙️ Tinh chỉnh cảnh báo"
+- `tabs/tab_cbtd_dashboard.py` — Xóa expander chỉnh ngưỡng cảnh báo (Ngưỡng QH %, ĐGD quá tải, ấp quá tải) khỏi Bộ lọc dữ liệu; `canh_bao_cbtd_dia_ban()` giờ dùng ngưỡng mặc định của service.
+
+## [2026-09-13] — Hoàn thiện regression cho bảng xếp hạng và snapshot CBTD–Tổ TK&VV
+- `tabs/tab_cbtd.py` — Chuẩn hóa giá trị số khi tính bảng xếp hạng để `NaN` trong snapshot cũ không làm hỏng delta và dòng tổng.
+- `snapshot_service.py` — Khử trùng Tổ theo `(mã Tổ, xã)` trước khi lưu snapshot CBTD; thông báo xóa kỳ dùng số bảng snapshot thực tế.
+- `tests/test_snapshot_service.py` — Đồng bộ fixture với migration 006; thêm regression cho ba chỉ tiêu mới, migration idempotent, snapshot CBTD–Tổ và xóa đồng bộ bảy bảng.
+- `tests/test_tab_cbtd_add_form.py` — Thêm regression cho thứ hạng giảm dần, delta và dữ liệu `NaN`.
+- `SCHEMA.md` — Bổ sung ba cột mới của `thon_snapshot` và schema `cbtd_to_tkvv_snapshot`.
+- `BUGMAP.md` — Ghi nhận lỗi fixture snapshot chưa theo migration 006 và sai lệch đếm Tổ trùng.
+
+## [2026-09-13] — Tổng quan theo CBTD: nhiều bảng xếp hạng + so sánh tháng trước & 31/12 năm trước
+- `services/cbtd_dia_ban_service.py` — `tong_hop_hstd_theo_thon` và `tong_hop_thon_snapshot_theo_cbtd` thêm 3 chỉ tiêu `Du_no_th`, `Cho_vay_nam`, `Thu_no_nam`.
+- `migrations/006_cbtd_comparison.py` — (mới) thêm 3 cột vào `thon_snapshot`; tạo bảng `cbtd_to_tkvv_snapshot` (xếp loại Tổ TK&VV theo CBTD).
+- `snapshot_service.py` — ghi/đọc 3 cột mới trong `thon_snapshot`; thêm `luu_cbtd_to_tkvv_snapshot` / `doc_cbtd_to_tkvv_snapshot`; đăng ký cache + bảng snapshot mới.
+- `services/upload_service.py` — auto-snapshot lưu thêm xếp loại Tổ TK&VV theo từng CBTD cùng kỳ.
+- `tabs/tab_cbtd.py` — viết lại "📊 Tổng quan theo CBTD" thành nhiều bảng xếp hạng (giảm dần) kèm Δ tháng trước và Δ 31/12 năm trước (tô màu xanh/đỏ), thêm bảng Chất lượng Tổ TK&VV.
+
+## [2026-09-13] — Tab CBTD: lọc PGD từ đầu + bảng "Số liệu theo từng CBTD" ẩn mã/PGD, thêm cột Tổ TK&VV
+- `tabs/tab_cbtd.py` — Thêm selectbox "🏢 Phòng giao dịch" ở đầu tab (CN mode) để lọc toàn bộ tab theo PGD.
+- `tabs/tab_cbtd.py` — Bảng "📊 Số liệu theo từng CBTD" (Nhóm 1): ẩn cột Mã CBTD và PGD; thêm cột Tổng số Tổ, Tổ Tốt, Tổ Khá, Tổ TB, Tổ Yếu (ghép từ CDTOTKVV qua ĐGD/thôn).
+
+## [2026-09-13] — Tab CBTD: tách "chọn CBTD → chi tiết" thành tab con riêng
+- `tabs/tab_cbtd.py` — Đổi tab Nhóm 1 "📊 Trang chủ cá nhân" → "🔎 Chi tiết theo CBTD" (chọn CBTD → xem chi tiết); phần dashboard tổng do mục "📊 Tổng quan theo CBTD" đảm nhận.
+
+## [2026-09-13] — Tab CBTD: thêm mục Tổng quan theo CBTD (trước 6 nhóm)
+- `tabs/tab_cbtd.py` — Thêm mục "📊 Tổng quan theo CBTD" ở đầu tab: KPI tổng + bảng tất cả CBTD × chỉ tiêu (dư nợ, QH, cho vay, thu nợ, đến hạn, 3T KHĐ, rủi ro), kèm dòng Tổng cộng + xuất Excel/PDF.
+
+## [2026-09-13] — Tab CBTD: thêm dòng Tổng cộng + xuất Excel/PDF cho bảng "Số liệu theo từng CBTD"
+- `tabs/tab_cbtd.py` — Bảng "📊 Số liệu theo từng CBTD" (Nhóm 1) thêm dòng `TỔNG CỘNG`; Excel kèm dòng tổng; thêm nút In PDF (dùng `xuat_pdf_co_chart`, đơn vị triệu đồng).
+
+## [2026-09-13] — Tab CBTD: tách dòng vay trực tiếp + sub-tab giao việc theo dõi
+- `tabs/tab_cbtd.py` — Bảng "📊 Tổng hợp dư nợ theo CBTD" tách riêng dòng `VAY TRỰC TIẾP (HTV=1)` và TỔNG CỘNG cộng cả vay trực tiếp để khớp tổng.
+- `tabs/tab_cbtd.py` — Thêm sub-tab "🏦 Vay trực tiếp (HTV=1)" (Nhóm 2): danh sách món HTV=1 toàn CN + giao/gỡ việc theo dõi cho CBTD, lưu kv_store key `phan_cong_vay_truc_tiep`.
+
+## [2026-09-13] — Tab CBTD: thêm dòng Tổng cộng cho bảng Tổng hợp dư nợ theo CBTD
+- `tabs/tab_cbtd.py` — Bảng "📊 Tổng hợp dư nợ theo CBTD" thêm dòng TỔNG CỘNG (Số KH, món vay, dư nợ, QH, tỷ lệ QH, ĐGD, ấp).
+
+## [2026-09-13] — Review và sửa tính toàn vẹn snapshot thôn/CBTD
+- `migrations/003_thon_snapshot.py`, `migrations/004_ensure_thon_snapshot.py`, `migrations/005_thon_snapshot_identity.py` — Đưa PGD và mã thôn vào định danh; nâng schema version 4 có bảo toàn dữ liệu; giữ bảng `cbtd_snapshot` legacy thay vì xóa phá hủy.
+- `services/cbtd_dia_ban_service.py` — Snapshot theo `(PGD, Mã thôn, Xã, Thôn)`, giữ ngày số liệu từng địa bàn và gán lại CBTD qua helper chuẩn ưu tiên mã thôn; khóa legacy thiếu PGD chỉ được gán khi duy nhất toàn Chi nhánh.
+- `snapshot_service.py` — Lưu/đọc đủ PGD và mã thôn; ghi lại cùng kỳ bằng delete+insert nguyên tử, rollback khi lỗi và audit cả thành công/thất bại.
+- `snapshot_service.py`, `tabs/tab_cbtd.py` — Parse riêng ngày ISO năm-đầu để không đảo kỳ khi ngày trong tháng ≤ 12.
+- `services/upload_service.py` — Kiểm tra kết quả auto-snapshot thôn và tạo snapshot thôn cả cho baseline HSTD 31/12.
+- `tabs/tab_cbtd.py` — Chỉ so tháng trước khi snapshot thôn đúng cuối tháng và dùng kỳ suy ra từ dữ liệu HSTD.
+- `tests/test_snapshot_service.py`, `tests/test_cbtd_dia_ban_review.py`, `tests/test_merge_du_lieu_toan_cn.py` — Regression cho migration bảo toàn dữ liệu, stale-row/rollback, trùng địa bàn giữa PGD, fallback legacy an toàn và chặn daemon snapshot ghi DB thật khi test.
+- `SCHEMA.md`, `BUGMAP.md` — Bổ sung schema `thon_snapshot` và bản đồ lỗi D14.
+
+## [2026-09-13] — Tab CBTD: bỏ cột chương trình DN lớn nhất, thêm chỉ tiêu vay/thu nợ/đến hạn/rủi ro + snapshot thôn
+- `migrations/003_thon_snapshot.py` + migration tương thích — Thêm bảng `thon_snapshot` theo địa bàn gốc để gán lại CBTD qua mapping khi cần.
+- `services/cbtd_dia_ban_service.py` — `tong_hop_hstd_theo_cbtd()` bỏ cột `So_CT`/`CT_du_no_lon_nhat`/`Du_no_ct_lon_nhat`, thêm chỉ tiêu cho vay/thu nợ (tháng+năm), nợ đến hạn (món+gốc), món 3 tháng KHĐ và món rủi ro; thêm `tong_hop_hstd_theo_thon()` và `tong_hop_thon_snapshot_theo_cbtd()`.
+- `snapshot_service.py` — Thêm `luu_thon_snapshot()`, `doc_thon_snapshot()`, `danh_sach_ky_thon()`; thêm `thon_snapshot` vào danh sách bảng snapshot và clear cache.
+- `services/upload_service.py` — Gọi `luu_thon_snapshot()` sau merge HSTD để lưu snapshot theo thôn mỗi tháng.
+- `tabs/tab_cbtd.py` — Cập nhật bảng số liệu CBTD (`_render_g1`, `_render_g3`): bỏ cột chương trình, hiển thị chỉ tiêu mới và so sánh delta với kỳ tháng trước (gán lại CBTD từ snapshot thôn).
+- `tests/test_cbtd_dia_ban_review.py`, `tests/test_snapshot_service.py` — Cập nhật assertion cho cột mới và bảng `thon_snapshot`.
+
+## [2026-09-13] — Review và hoàn thiện snapshot HSTD tháng trước/31-12
+- `snapshot_service.py` — Chỉ chọn đúng kỳ tháng liền trước; giữ ngày số liệu thực tế theo từng PGD/nhóm; thêm kiểm tra snapshot cuối tháng; khi lưu lại cùng kỳ, thay toàn bộ dữ liệu trong một transaction và rollback nếu insert lỗi.
+- `workspaces/ws_executive.py` — KPI "so tháng trước" không fallback sang kỳ cũ và chỉ tính delta khi snapshot tháng trước có ngày số liệu đúng cuối tháng.
+- `tabs/tab_mau03_khnv.py` — Mẫu 03 bỏ mốc tháng trước nếu snapshot không phải cuối tháng; ngày báo cáo ưu tiên lấy từ dòng tổng `__CN__` và không tự suy diễn khi metadata thiếu.
+- `services/upload_service.py` — Khi tổng hợp baseline HSTD 31/12, truyền kỳ `YYYY-12` tường minh vào `luu_snapshot()`.
+- `tests/test_snapshot_service.py` — Bổ sung regression cho kỳ liền trước chính xác, bảo toàn ngày thật theo PGD, thay thế dữ liệu cùng kỳ và rollback nguyên tử.
+- `tests/test_tab_mau03_khnv.py` — Kiểm tra Mẫu 03 không dùng snapshot giữa tháng làm mốc "tháng trước".
+- `tests/test_merge_du_lieu_toan_cn.py` — Kiểm tra luồng baseline truyền đúng kỳ 31/12 cho cả HSTD và ủy thác snapshot.
+
+## [2026-09-13] — Hoàn thiện review Mẫu 03/KHNV sau agent khác
+- `tabs/tab_mau03_khnv.py` — Escape text động trước khi ghép vào `st.html()` cho header/bảng Mẫu 03; giữ `raw_html=True` chỉ cho span màu delta do hệ thống tự sinh.
+- `tests/test_tab_mau03_khnv.py` — Thêm regression dòng tổng bỏ qua `__CN__` để tránh cộng trùng và test HTML escape nhưng vẫn giữ span màu delta.
+
+## [2026-09-13] — Rà soát hoàn chỉnh Mẫu 03/KHNV sau agent khác
+- `tabs/tab_mau03_khnv.py` — Không fallback "tháng trước" sang kỳ snapshot cũ khi thiếu tháng liền trước; nếu thiếu mốc so sánh tháng trước hoặc baseline 31/12 thì delta hiển thị `—` thay vì tính như so với 0. Làm gọn helper tính delta NQH/Nợ khoanh/NQH+Khoanh.
+- `tests/test_tab_mau03_khnv.py` — Thêm 3 regression cho chọn kỳ tháng trước, thiếu mốc so sánh và delta từ baseline 31/12.
+- `tests/test_smoke_imports.py` — Thêm `tabs.tab_mau03_khnv` vào danh sách smoke import/render để tab mới được kiểm tra tự động.
+
+## [2026-09-12] — Báo cáo Chất lượng tín dụng: tinh gọn header & căn lề bảng
+- `tabs/tab_mau03_khnv.py` — Gom header (tên NH, chi nhánh, tiêu đề, ngày số liệu, Mẫu 03/KHNV) thành 1 khối `st.html()` căn giữa gọn gàng thay cho 2 cột + h3 rời. Rút gọn nhãn cột bảng: "Tăng(+),giảm(−) so với tháng trước" → "± tháng trước", "…so với 31/12 năm trước" → "± 31/12", "Tỷ lệ (%)" → "Tỷ lệ %"; giảm min-width cột để bảng đỡ tràn ngang. Bỏ dòng "Đơn vị: Triệu đồng, %" trùng caption.
+- `py_compile`: OK exit code 0.
+
+## [2026-09-12] — Fix Báo cáo Chất lượng tín dụng: cột "so với 31/12" dùng sai nguồn (snapshot 2026-04 thay vì baseline)
+- `tabs/tab_mau03_khnv.py` — Cột "Tăng/giảm so với 31/12 năm trước" trước đây lấy mốc từ `hstd_snapshot` (fallback về kỳ cũ nhất 2026-04 vì không có snapshot 2025-12) → sai hoàn toàn. Sửa sang đọc mốc 31/12 từ baseline HSTD: thêm `_doc_baseline_theo_pgd(nam)` dùng `doc_baseline_merged(nam, ts=ts_baseline_merged(nam))` rồi groupby theo PGD. `_tim_ba_ky()` chỉ còn trả (kỳ hiện tại, tháng trước); `_lay_du_lieu_3_ky()` tính `nam_bl = năm hiện tại − 1` và trả `moc_cn = "31/12/{nam_bl}"` + df baseline.
+- Cập nhật info box "So với mốc 31/12", meta Excel "Mốc cuối năm", ghi chú nguồn dữ liệu.
+- Xác minh số liệu thật: d_31/12 NQH từ sai `-546.78` → đúng `-546.31`; Khoanh từ sai `+200.15` → đúng `+338.58`; NQH+Khoanh từ sai `-346.63` → đúng `-207.73` (triệu đồng).
+- `py_compile`: OK exit code 0.
+
+## [2026-09-13] — Chuẩn hóa nhãn màu tăng/giảm Báo cáo Chất lượng tín dụng
+- `tabs/tab_mau03_khnv.py` — Giữ quy ước màu delta theo yêu cầu: dương/tăng = xanh lá `#2E7D32`, âm/giảm = đỏ `#C62828`; sửa docstring module, caption và metadata Excel để không còn mô tả ngược hoặc ký tự lỗi.
+
+## [2026-09-12] — Báo cáo Chất lượng tín dụng: đổi màu chênh lệch (Tăng xanh, Giảm đỏ)
+- `tabs/tab_mau03_khnv.py` `_fmt_delta()` — Đảo màu delta: dương (tăng) → xanh lá `#2E7D32`, âm (giảm) → đỏ `#C62828` (theo yêu cầu). Cập nhật docstring module, caption và ghi chú expander cho khớp.
+- `py_compile`: OK exit code 0.
+
+## [2026-09-12] — Fix Báo cáo Chất lượng tín dụng: bảng dữ liệu bị render thành chuỗi HTML thô
+- `tabs/tab_mau03_khnv.py` `_render_bang_html()` — Đổi `st.markdown(..., unsafe_allow_html=True)` → `st.html()` cho khối bảng 15 cột. Streamlit 1.60 CommonMark hiểu nhầm thụt lề/dòng trống trong f-string HTML thành code block, khiến toàn bộ `<tbody>` (23 dòng số liệu) bị escape thành chuỗi HTML thô thay vì bảng. Dùng `st.html()` bypass Markdown parser (đúng pattern đã có trong BUGMAP B7).
+- `py_compile`: OK exit code 0.
+
+## [2026-09-12] — Hoàn tất tên hiển thị Báo cáo Chất lượng tín dụng
+- `tabs/tab_mau03_khnv.py` — Sửa ký tự hỏng ở subheader thành `📊 Báo cáo Chất lượng tín dụng` và cập nhật docstring `render()` theo tên hiển thị mới.
+
+## [2026-09-12] — Tối ưu chuyển tab VBSP-SCM
+- `workspaces/ws_management.py` dòng ~607 — chỉ khôi phục tab Phòng KH-NV từ `kv_store` một lần khi session chưa có state; bỏ đọc/ghi `kv_store` và audit log trên mỗi rerun đổi tab để giảm độ khựng khi chuyển menu.
+- `workspaces/ws_operation.py` dòng ~149 — cache `_lazy_tab()` bằng `st.cache_resource` để tab PGD không gọi lại import loader mỗi lần chuyển.
+- `utils.py` dòng ~687 — `lazy_tabs()` ưu tiên đọc `__code__` của renderer thay vì gọi `inspect.signature()` trong rerun thường.
+- `state_manager.py` dòng ~172 — thêm default `ws_op_menu` vào namespace navigation để state PGD nhất quán ngay từ lúc khởi tạo.
+
+## [2026-09-12] — Đổi tên hiển thị Mẫu 03 CLTĐ → "Báo cáo Chất lượng tín dụng"
+- `workspaces/ws_executive.py` L1342 — Menu Lãnh đạo: label "📑 Mẫu 03 CLTĐ" → "📊 Báo cáo Chất lượng tín dụng".
+- `workspaces/ws_management.py` L354 — Menu Phòng KHNV: label "📑 Mẫu 03 CLTĐ" → "📊 Báo cáo Chất lượng tín dụng", icon `file-spreadsheet` → `bar-chart-2`.
+- `tabs/tab_mau03_khnv.py` — Subheader "📑 Mẫu 03/KHNV — ..." → "📊 Báo cáo Chất lượng tín dụng"; caption bổ sung "(dạng Mẫu 03/KHNV)"; header phải thêm "Form Báo cáo Chất lượng tín dụng"; nút Excel đổi label + tên file `BaoCao_ChatLuongTinDung_{ky_ht}.xlsx`; meta sheet "Tên báo cáo" → "Báo cáo Chất lượng tín dụng (Mẫu 03/KHNV)". Giữ "Mẫu 03/KHNV" làm mã biểu tham chiếu.
+- `py_compile` 3 file: OK exit code 0.
+
+## [2026-09-12] — Bổ sung Mẫu 03 CLTĐ vào Menu Phòng KHNV (ws_management)
+- `workspaces/ws_management.py` L354 — Nhóm "Báo cáo" phân hệ Điều hành (Phòng KHNV: manager_cn / chuyenvien_cn) thêm mục "📑 Mẫu 03 CLTĐ" (icon `file-spreadsheet`), đặt ngay sau "📄 Báo cáo KHNV". Call `_get_tab("tab_mau03_khnv").render(None, **kwargs)` pattern giống các tab báo cáo khác. Bây giờ Mẫu 03 xuất hiện ở BOTH 2 phân hệ: Lãnh đạo (ws_executive) và Phòng KHNV (ws_management).
+- `py_compile`: OK exit code 0.
+
+## [2026-09-12] — Rà convention tab Mẫu 03/KHNV
+- `tabs/tab_mau03_khnv.py` — Bỏ import `fmt_ty` không dùng và thay nhánh `except Exception: pass` khi đọc ngày snapshot bằng `logger.error(..., exc_info=True)` để đúng convention logging.
+
+## [2026-09-12] — Thêm Báo cáo Mẫu 03/KHNV Chất lượng tín dụng
+- `tabs/tab_mau03_khnv.py` — Tạo tab mới báo cáo Chất lượng tín dụng theo Mẫu 03/KHNV: tổng hợp 15 cột theo Hội sở + 21 PGD (Tổng dư nợ / Nợ QH+Khoanh / Trong đó Nợ QH / Trong đó Nợ Khoanh), mỗi nhóm gồm Số tiền, Tỷ lệ %, Chênh lệch tháng trước, Chênh lệch 31/12/năm trước. Đơn vị triệu đồng 2 số lẻ & % 2 số lẻ. Đảo màu delta nghiệp vụ: Nợ TĂNG (dương) = ĐỎ xấu, Nợ GIẢM (âm) = XANH LÁ tốt. Nguồn dữ liệu từ `hstd_snapshot` 3 kỳ (hiện tại / tháng trước / cuối năm trước). Header bảng 3 tầng bằng HTML. Xuất Excel 2 sheet: `BaoCao_ChatLuongTD` dữ liệu 22 đơn vị + tổng, `ThongTinCauHinh` ghi rõ kỳ, mốc so sánh, đơn vị, nguồn.
+- `workspaces/ws_executive.py` L1342 — Menu nhóm "Báo cáo" thêm entry "📑 Mẫu 03 CLTĐ" lazy-load tab_mau03_khnv.render với **kwargs (để nhận df, df_full, role, username chuẩn).
+- `py_compile` 2 file: exit code 0.
+
+## [2026-09-12] — CBTD Nhóm 3: Bảng dư nợ theo CBTD/Xã/Chương trình giống mẫu RPT
+- `services/cbtd_dia_ban_service.py` — Thêm `tong_hop_hstd_cbtd_xa_chuong_trinh()` để tổng hợp HSTD theo cấu trúc mẫu PDF: CBTD → xã quản lý → chương trình, gồm KH vay vốn, món vay, tổng dư nợ, trong hạn, quá hạn, khoanh, cho vay tháng, thu nợ tháng, dư nợ tăng/giảm tháng/năm, quá hạn tăng/giảm tháng/năm và tỷ lệ quá hạn.
+- `tabs/tab_cbtd.py` — Bảng 1 trong Nhóm 3 đổi từ tổng theo CBTD sang bảng chi tiết CBTD/Xã/Chương trình; KPI tổng vẫn hiển thị tổng dư nợ, dư nợ quá hạn, tổng món vay, CBTD có NQH. Excel đổi sheet sang `Du_no_Xa_CT_theo_CBTD`.
+- `tests/test_cbtd_dia_ban_review.py` — Thêm regression cho bảng kiểu RPT, kiểm tra lọc Hình thức vay, số KH/món vay, cho vay/thu nợ và các cột tăng giảm.
+
+## [2026-09-12] — CBTD Nhóm 3: thêm Bảng 1 (Dư nợ & NQH) + Bảng 2 (Tổ TK&VV) theo CBTD
+- `tabs/tab_cbtd.py` — Tab A "📊 Số liệu đánh giá tự động" thêm 2 bảng dữ liệu chuyên sâu trước bảng tổng hợp đầy đủ:
+  - **Bảng 1 💰 Dư nợ & Nợ quá hạn theo CBTD**: join HSTD với địa bàn CBTD qua `gan_cbtd_vao_df()`, loại Hình thức vay = 1, chỉ tính dư nợ > 0. Cột: Mã CBTD / Họ tên / PGD / Số KH / Số món / Tổng dư nợ (triệu) / DN trong hạn / DN quá hạn / TL QH % / Số món QH / Nợ khoanh. 4 KPI tổng quan: Tổng dư nợ (tỷ), DN quá hạn (triệu), Tổng số món QH, CBTD có NQH.
+  - **Bảng 2 🏘️ Tổ TK&VV quản lý & xếp loại**: đọc CDTOTKVV tổng hợp (`tong_hop_tu_pgd_data()`), ghép Tổ vào CBTD qua `lay_to_theo_cbtd()`. Cột: Mã CBTD / Họ tên / PGD / Số ĐGD / Số tổ / Tổ Tốt / Tổ Khá / Tổ TB / Tổ Yếu / Chưa XL / % Tổ đạt / Điểm TB tổ / Xã có tổ. 5 KPI: Tổng số tổ, Tổ Tốt, Tổ Khá, Tổ TB, Tổ Yếu. Định nghĩa % Tổ đạt = (Tốt + Khá) / tổng đã xếp loại.
+  - Nút tải Excel đổi từ 1 sheet thành 3 sheet: `Du_no_NQH_theo_CBTD`, `To_TKVV_theo_CBTD`, `Tong_hop_day_du` + sheet `Tham_so` (ghi rõ 2 nguồn dữ liệu).
+- `tabs/tab_cbtd.py` import — Thêm `COT_DU_NO_TH`, `COT_DU_NO_KHOANH` (config) và `lay_to_theo_cbtd` (service).
+- Đã verify bằng dữ liệu thật: Bảng 1 ra 4 CBTD (tổng DN 213.90 tỷ, NQH 959 triệu, TL QH 0.15-0.70%), Bảng 2 ra 80 tổ (56 Tốt / 16 Khá / 7 TB / 1 Yếu), khớp nhãn xếp loại `Tốt/Khá/Trung bình/Yếu` trong CDTOTKVV.
+- Dọn các file tạm verify/debug trong `outputs/gom_dgd_hoi_so_20260906/` và log xoay vòng tạm `logs/app.log.2`.
+
+## [2026-09-12] — CBTD Nhóm 1: bỏ bộ chọn Năm/Tháng/Ngày hôm nay, luôn dùng ngày hiện tại
+- `tabs/tab_cbtd.py` L547-555 — Xóa 3 widget `_nam` (number_input), `_thang` (number_input), `_today` (date_input) trong `_render_g1()` theo yêu cầu người dùng (không cần thiết, chiếm diện tích dưới hộp chọn CBTD). Thay bằng `_today = date.today()` → `_nam = int(_today.year)`, `_thang = int(_today.month)`; thêm 1 dòng `st.caption` hiển thị "📅 Kỳ đánh giá: tháng MM/YYYY (tính đến ngày DD/MM/YYYY)" để người dùng vẫn biết số liệu thuộc kỳ nào.
+- Giữ nguyên toàn bộ call-site phía dưới (`lay_kpi_cbtd_theo_thang`, `cham_diem_cbtd_thang`, `top_3_viec_uu_tien`, `tong_hop_hstd_theo_cbtd`, tên file Excel `So_lieu_CBTD_{MM}_{YYYY}.xlsx`) — chỉ đổi nguồn giá trị từ widget sang ngày hệ thống.
+- Loại bỏ luôn 3 widget key `{prefix}lv2_1_nam/thang/today` (không còn khai báo → không rủi ro state cũ).
+- Nhóm 3 (Đánh giá & Nhiệm vụ thủ công) **giữ nguyên** bộ chọn Năm/Tháng vì cần để xác định key kv_store `nhiem_vu_cbtd_{YYYY}_{MM}` khi xem/nhập nhiệm vụ kỳ trước.
+
+## [2026-09-12] — Fix crash "Phân công ĐGD phụ trách": 'list' object has no attribute 'get'
+- `data/khtd.py` — Thêm helper `lay_thong_tin_dgd_theo_ten(pgd, ds_dgd, dgd_map) -> dict[dgd_name] → {"xa":..., "thon":[...]}`. UI cần `.get(ten_dgd)` thì dùng hàm này; join HSTD (list of tuple) vẫn dùng `lay_ap_tu_dgd_list()` cũ. Preserve ĐGD trong ds_dgd ngay cả khi dgd_map chưa có entry (trả về xa="" / thon=[]) để bảng phân công không mất dòng. Hỗ trợ 2 schema entry: list cũ `[ap1, ap2]` và dict mới `{"thon":[...]}`. Filter None / pd.NA / rỗng / nan.
+- `tabs/tab_cbtd.py` import — Thêm `lay_thong_tin_dgd_theo_ten` vào import từ `data.khtd`.
+- `tabs/tab_cbtd.py` "Phân công ĐGD phụ trách" — Thay `lay_ap_tu_dgd_list(...)` (trả list of tuple) bằng `lay_thong_tin_dgd_theo_ten(...)` (trả dict). Dòng kế tiếp gọi `.get(_dgd, {})` nên crash `AttributeError: 'list' object has no attribute 'get'`.
+
+## [2026-09-12] — Fix chấm điểm Nhóm 3 CBTD gọi sai signature
+- `tabs/tab_cbtd.py` L1976/L2016 — Sửa 2 call `cham_diem_cbtd_thang()` trong Nhóm 3 sang signature hiện tại `cham_diem_cbtd_thang(ma_cb, yyyy, mm, *, cbtd_data, dgd_map, df_hstd, scope_pgd)`, tránh `TypeError` khi xem điểm 1 CBTD hoặc BXH nhanh.
+- `tabs/tab_cbtd.py` L1981/L2028 — Đọc điểm từ key chuẩn `diem_tong` (fallback `tong_diem` để tương thích), nên KPI và BXH không còn luôn về 0.
+- `BUGMAP.md` mục J86 — Ghi nhận lỗi gọi sai signature helper CBTD.
+- `Verify` — `py_compile tabs/tab_cbtd.py` OK; `pytest tests/test_cbtd_dia_ban_review.py tests/test_tab_cbtd_add_form.py -q` = 8 passed.
+
+## [2026-09-12] — Nâng cấp Nhóm 3 CBTD: Đánh giá công việc (auto từ HSTD) + Nhập nhiệm vụ thủ công tháng
+- `tabs/tab_cbtd.py` L1835-2359 — Thay placeholder `_render_g3` (cũ: st.info "Sẽ cập nhật sau Step 4") bằng UI thật 2 tab con:
+  - **Tab A 📊 Số liệu đánh giá tự động (từ HSTD):** Gọi `tong_hop_hstd_theo_cbtd()` (import sẵn) để tổng hợp số liệu theo từng CBTD (Số ĐGD/Số ấp/Số KH/Tổng DN/DN QH/TL QH/KH mới tháng/Giải ngân tháng…). Hiển thị 5 KPI tổng quan phạm vi, bảng chi tiết format tiền → triệu, nút tải Excel đánh giá, điểm CBTD chi tiết (gọi `cham_diem_cbtd_thang()` clamp 0-100) + expander chi tiết chấm điểm, BXH tự động khi ≤10 CBTD.
+  - **Tab B 📝 Nhiệm vụ thủ công tháng:** Persist theo kv_store key `nhiem_vu_cbtd_{YYYY}_{MM}` (cấu trúc dict[ma_cb] = list nhiệm vụ). Thêm nhiệm vụ bằng form, cập nhật hàng loạt bằng `st.data_editor(num_rows="dynamic")` có ProgressColumn (Hoàn thành %), clamp 0-100 trọng số & HT%, validate Tên nhiệm vụ không rỗng, tính tiến độ tổng hợp (tl_ht = Σts*ht% / Σts, clamp 0-100%) hiển thị progress bar + kpi_row, nút xóa nhiệm vụ CBTD, nút tải Excel toàn kỳ có dòng 【TỔNG KẾT】 mỗi CBTD.
+- Toàn bộ thao tác ghi KV có `db.ghi_kv()` + `db.ghi_audit()` (action `them_nhiem_vu_cbtd` / `cap_nhat_nhiem_vu_cbtd` / `xoa_nhiem_vu_cbtd`) + `state.downloads.clear()` + `st.rerun()` sau thay đổi.
+- Widget key có prefix `{_kp}lv2_3_` (cn_ hoặc pgd_{slug}_) tránh DuplicateElementKey.
+- Scope filter: theo PGD (pgd_user mode) + theo mã CBTD cụ thể (hoặc tất cả).
+
+## [2026-09-12] — Fix crash render 👔 CBTD & Địa bàn: `'int' object is not subscriptable`
+- `tabs/tab_quan_ly_dgd.py` L1618-L1620 — Xóa dòng dead-code `ma_unique_ok = ma_unique[mask_ok] if ... else ma_unique.loc[mask_ok]` trong `_render_bao_cao_tong_hop_cbtd()`. Dòng trên đã gán đè `ma_unique = ma_unique[ma_unique != ""].nunique()` (Series → int) nên index lại `ma_unique[mask_ok]` gây `TypeError`. Biến `ma_unique_ok` không dùng ở đâu nên xóa an toàn, giữ nguyên số liệu `kp3.metric("Số mã thôn có DN", ...)`.
+- `BUGMAP.md` mục J85 — Ghi nhận bug (lặp lại 2026-09-11 và 2026-09-12).
+- `Verify` — `py_compile tabs/tab_quan_ly_dgd.py` exit 0.
+
+## [2026-09-11] — CBTD & Địa bàn: Thêm nút Xuất Excel + In PDF cho các bảng thống kê chấm công
+- `tabs/tab_cbtd.py` L878-L943 — Sub-tab **📋 Danh sách CBTD**: Thêm 2 nút dưới bảng `📥 Xuất Excel danh sách CBTD` (xuất sheet Danh_sach_CBTD) + `🖨️ In PDF danh sách CBTD` (gọi `xuat_pdf_co_chart` với cols_tien cols_dem cols_percent auto detect, format đơn vị triệu đồng). Nút PDF nằm trong `try/except` 2 lớp (import ReportLab + tạo PDF), lỗi thì hiển thị button disabled chứ không crash app.
+- `tabs/tab_cbtd.py` L981-L1030 — Sub-tab **🗺️ Bản đồ ĐGD → CBTD**: Thêm 2 nút Xuất Excel + In PDF, cols_dem tự nhận cột "Số ấp".
+- `tabs/tab_quan_ly_dgd.py` L789-L825 — Section **Trạng thái cấu hình Địa bàn từng PGD**: Thêm 2 nút export, cols_dem ["Số xã", "Số ĐGD", "Số ấp/KP", "Số mã thôn"].
+- `tabs/tab_quan_ly_dgd.py` L831-L926 — 2 Tab "Chưa phân công": (cp1) Mã thôn có DN chưa xác định ĐGD: 2 nút export cols_tien ["Du_no_trieu"], them_dong_tong=True; (cp2) ĐGD chưa gắn CBTD: 2 nút export.
+- `tabs/tab_quan_ly_dgd.py` L1667-L1729 — Bảng **📊 Tổng hợp KPI theo CBTD**: Xuất Excel 2 sheet (`KPI_theo_CBTD` + `Thong_tin_CBTD_config` — cấu hình đầy đủ Mã/Họ tên/Chức vụ/PGD/SĐT/Số ĐGD/Ngày bổ nhiệm/Ghi chú/Tự tạo); In PDF them_dong_tong=True, cols_percent ["% Dư nợ / Tổng", "% Nợ QH / Dư nợ"], don_vi_tien triệu đồng.
+- `tabs/tab_quan_ly_dgd.py` L1752-L1804 — Expander ⚠️ N dòng thuộc ĐGD CHƯA có CBTD: Thêm 2 nút Xuất Excel (top 500 DN cao nhất) + In PDF, them_dong_tong=True.
+- `Verify` — py_compile 2 file OK; pytest test_smoke_imports.py 107/107 passed (cả import lẫn render 2 tab: tabs.tab_cbtd + tabs.tab_quan_ly_dgd).
+
+## [2026-09-11] — Fix form Chỉnh sửa CBTD bị dính tên/địa bàn của cán bộ trước
+- `tabs/tab_cbtd.py` L1299-L1341 — Mode `✏️ Chỉnh sửa` dùng `edit_kp` theo mã CBTD đang chọn; các ô Họ tên/Chức vụ/Ngày bổ nhiệm/SĐT/Ghi chú/PGD không còn giữ state của CBTD vừa sửa trước đó.
+- `tabs/tab_cbtd.py` L1341 — Multiselect `ĐGD phụ trách` thêm slug PGD vào key, nên khi đổi `PGD trực thuộc` thì danh sách địa bàn reset đúng theo PGD mới và lưu vào chính cán bộ đang chọn.
+- `tests/test_tab_cbtd_add_form.py` — Thêm regression kiểm tra form sửa CBTD có key scoped theo CBTD và PGD.
+
+## [2026-09-07] — Fix runtime mode Sửa hàng loạt / Đổi mã CBTD
+- `tabs/tab_cbtd.py` L71-80 — `_validate_ma_cb()` nhận thêm `bo_qua_ma` và vẫn hỗ trợ tham số `existed` cũ; mode Đổi mã CBTD không còn TypeError khi validate mã mới trùng chính mã cũ.
+- `tabs/tab_cbtd.py` L1471 / L1497-1540 — Mode Sửa hàng loạt dùng mask checkbox `.fillna(False).astype(bool)` và build `cbtd_draft` trước; chỉ update `cbtd_data` khi toàn bộ batch validate OK, đúng cam kết atomic.
+- `tabs/tab_cbtd.py` L1572 / L1582 — Mã CBTD mới được chuẩn hóa `.upper()` trước validate/lưu để thống nhất với regex và các key hiện có.
+
+## [2026-09-06] — UI CBTD nâng cấp 3 chế độ sửa (lọc nhanh + sửa hàng loạt + đổi mã) — fix "đánh tên nhầm sửa rất khó"
+- `tabs/tab_cbtd.py` L1095-L1104 — Radio `che_do` thêm 2 mode mới `🔄 Sửa hàng loạt` + `🪪 Đổi mã CBTD` (tổng 5 modes: Thêm → Sửa 1 → Sửa hàng loạt → Đổi mã → Xóa). Widget keys dùng `_kp_g2` prefix tránh DuplicateElementKey.
+- `tabs/tab_cbtd.py` L1231-L1392 — Mode `✏️ Chỉnh sửa` nâng cấp từ selectbox thô 300+ CBTD → **Bộ lọc 3 cột** (🔎 Tìm Mã/Tên/SĐT/Ghi chú + Lọc PGD + Lọc Chức vụ) → DataFrame hiển thị kết quả lọc (Mã | Họ tên | CV | PGD | SĐT | Số ĐGD | Ghi chú | Tự tạo ✅) → Selectbox CHỈ chứa kết quả đã lọc. Lưu CBTD giữ nguyên meta `auto_generated` + `created_by` (không reset cờ tự tạo khi sửa CBTD tạm). Phần nhập liệu + nút Lưu nằm TRONG block `else: keys_loc not empty` tránh crash khi không có CBTD trùng lọc.
+- `tabs/tab_cbtd.py` L1394-L1499 — Mode mới `🔄 Sửa hàng loạt (batch)`: Bộ lọc 4 yếu tố (+ Lọc dấu hiệu: chỉ CBTD tự tạo / SĐT trống / Ghi chú Tự tạo từ ĐGD) → `st.data_editor` 9 cột disabled chỉ cho tick cột `[Sửa?]` checkmark chọn dòng → Áp dụng thay đổi cho tất cả CBTD đã chọn: (i) Đổi Họ tên mới chung, (ii) Đổi Chức vụ chung, (iii) Đổi SĐT mới chung, (iv) Nối đuôi Ghi chú, (v) Bỏ cờ Tự tạo. Validate từng CBTD trước khi lưu: có 1 lỗi validate → KHÔNG lưu gì cả (atomic). `db.ghi_audit(username, "batch_update_cbtd", ...)` + `st.cache_data.clear()` sau khi lưu hàng loạt.
+- `tabs/tab_cbtd.py` L1501-L1564 — Mode mới `🪪 Đổi mã CBTD (rename key)`: Chọn mã cũ từ dropdown (format hiển thị Mã | Tên | PGD) → Nhập mã mới gọi `_validate_ma_cb(ma_moi, cbtd_data, bo_qua_ma=ma_cu)` (bỏ qua kiểm tra trùng với chính nó) → Thông tin 2 cột (Mã cũ + validate Mã mới) → Checkbox xác nhận đổi mã → disabled button khi chưa xác nhận / trùng mã cũ / mã mới lỗi. Logic an toàn: `if ma_moi not in cbtd_data: cbtd_data[ma_moi] = dict(info_cu); del cbtd_data[ma_cu]; luu_cbtd(...)` — `ds_dgd`, `ngay_bo_nhiem`, `auto_generated`, `created_by` được giữ nguyên 100%. `db.ghi_audit(username, "rename_cbtd", ma_cu → ma_moi)`.
+- `Verify` — `py_compile tabs/tab_cbtd.py` pass; `pytest test_smoke_imports.py` tabs.tab_cbtd import & render both passed.
+
+## [2026-09-06] — Nâng cấp CBTD: tự tạo 1 ĐGD=1 CBTD + bảng tổng hợp KPI real-time (độ phủ 100% Hội sở)
+- `data/khtd.py` L200-319 — Thêm 2 helper core:
+  - `danh_sach_dgd_chua_co_cbtd(dgd_map, cbtd_data, pgd_filter=None)` trả list các ĐGD có địa bàn nhưng ds_dgd chưa xuất hiện trong bất kỳ CBTD nào (O(1) reverse check).
+  - `tao_cbtd_tu_dgd(dgd_map, cbtd_data, pgd_filter, username, overwrite=False)` tự tạo CBTD tạm 1-1 theo ĐGD còn thiếu: `ma_cb = "CB_" + pgd_slug(ten_dgd)`, `ho_ten = ten_dgd`, `ds_dgd = [ten_dgd]`, cờ `auto_generated=True`. Hỗ trợ trùng tên ĐGD giữa các PGD (nối `_pgd_slug`). **An toàn mặc định: KHÔNG đụng tới CBTD đã có thật.**
+- `tabs/tab_quan_ly_dgd.py` L1190-1313 / L1428-1595 — Nâng cấp block Gán CBTD + new sub-component reusable `_render_bao_cao_tong_hop_cbtd()`:
+  - Phần đầu Gán CBTD: 3 KPI tổng quan (Tổng ĐGD / Đã gắn CBTD / Còn thiếu), 2 nút "Tạo nhanh CBTD (TOÀN HỆ THỐNG)" và "Tạo nhanh (riêng PGD X)", expander liệt kê Danh sách ĐGD còn thiếu theo PGD/Xã/Mã thôn trước khi user nhấn tạo.
+  - Phần cuối Gán CBTD: `_render_bao_cao_tong_hop_cbtd()` tính real-time trên HSTD (chuẩn PDF: loại HTV==1, DN>0) → 4 KPI card (Tổng DN / Đã gắn + % / Số mã thôn / Chưa gắn), bảng chi tiết **{len(grp)} CBTD** các cột: Mã CBTD | Họ tên | Số dòng HS | Số KH vay (nunique COT_MA_KH) | Dư nợ (triệu) | Nợ quá hạn (triệu) | % Dư nợ / Tổng | % Nợ QH / DN (COT_DU_NO_QH) → sắp xếp DN giảm dần.
+  - Expander cuối: **Dòng thuộc ĐGD (mã thôn nằm trong dgd_map) nhưng chưa có CBTD** → top 500 dư nợ lớn nhất. Mục tiêu 100% thì xuất thông báo ✅.
+- `Verify end-to-end (verify_upgrade_cbtd.py)`: cbtd_cũ (4 CBTD thật: 01,02,CBBINH,CBVY) → Độ phủ dư nợ Hội sở 31.40% (213,9 tỷ). Sau khi `tao_cbtd_tu_dgd` tạo thêm 19 CBTD tạm (CB_bien_hoa, CB_buu_hoa, ... CB_trung_dung) → Độ phủ **100.00%** (681,280.2 / 681,280.2 triệu). Số dòng thuộc ĐGD CHƯA có CBTD: **0 dòng / 0.0 triệu**. Tổng 23 CBTD Hội sở (4 thật + 19 tạm).
+- `QA` — py_compile OK 5 file; test_smoke_imports 119 passed, test_config/test_cbtd_dia_ban_review/test_khtd_service OK (exit code 0); Widget keys unique (btn_tao_cbtd_all, btn_tao_cbtd_pgd_rieng, sel_pgd_nhanh_cbtd, tbl_tong_hop_cbtd_kpi, tbl_chua_co_cbtd_dong).
+
+## [2026-09-06] — UI Độ bao phủ ĐGD & schema mã thôn (gắn HSTD → CBTD)
+- `data/dgd_helpers.py` L59-96 — Thêm 3 helper schema entry mới: `ds_thon_cua_entry()`, `ds_ma_thon_cua_entry()`, `entry_giu_nguyen_meta()` (giữ `ma_thon` / `ngay_gdxa` khi UI sửa tên thôn); vá lỗi `pool_thon_cho_xa()` iterate entry dict bây giờ dùng `ds_thon_cua_entry()` thay vì lặp trực tiếp (buglist C55).
+- `data/khtd.py` L132-235 — Thêm normalizer mã `_normalize_ma_text()/_normalize_ma_series()` (bỏ `.0` đuôi số), `lay_ma_thon_tu_dgd_list()` + `xay_ma_thon_to_cbtd_map()` build reverse index; viết lại `gan_cbtd_vao_df()`: ƯU TIÊN join theo MÃ THÔN (vectorised `Series.map`), dòng còn thiếu fallback join key `xã + thôn`.
+- `tabs/tab_quan_ly_dgd.py` ~59-250 / ~694-792 / ~818-895 / ~1227-1260 — UI cập nhật: (1) `_dgd_to_rows` thêm cột Số mã thôn / Mã thôn / Ngày GDXA, tìm kiếm chấp nhận mã thôn. (2) `_tinh_bao_phu_dgd()` chuẩn số liệu PDF: loại `Hình thức vay == 1`, chỉ tính DN>0; xuất % dư nợ bao phủ, số mã thôn, ĐGD chưa gắn CBTD, CSV mã thôn chưa xác định ĐGD; fix C57 lọc đúng xã khi cross-check màn gán thôn. (3) `_render_tong_quan()` 6 card KPI độ bao phủ + 2 tab "Mã thôn chưa xác định ĐGD" / "ĐGD chưa gắn CBTD". (4) Cross-check tại màn gán thôn đổi sang metric dư nợ + mã thôn làm chính (tên thôn về expander phụ). (5) Màn gán CBTD hiển thị số lượng + danh sách mã thôn ĐGD đang phụ trách.
+- `tabs/tab_diem_gd_pgd.py` L~220 — Ghi cấu hình ĐGD PGD dùng `entry_giu_nguyen_meta()` giữ nguyên mã thôn (không mất dữ liệu Hội sở khi PGD sửa tên thôn).
+- `tabs/tab_bao_cao_giao_ban_pgd.py` L~290-315 — Vá lỗi iterate entry dict như list (C56): dùng `ds_thon_cua_entry()`/`ds_ma_thon_cua_entry()` + lọc theo cả Tên thôn và Mã thôn (OR mask) khi tách báo cáo giao ban từng ĐGD.
+- `db` kv_store `dgd_map` — áp dụng cho Hội sở CN: 9 xã, 26 ĐGD, 149 mã thôn + tên thôn tương ứng; verify end-to-end: 681.280 triệu (100% dư nợ thuộc ĐGD đã gắn CBTD), lệch tuyệt đối 337 triệu (0.050% so với PDF 31/07/2026).
+- `Verify` — `py_compile` 5 file (dgd_helpers, khtd, tab_quan_ly_dgd, tab_diem_gd_pgd, tab_bao_cao_giao_ban_pgd) pass; `pytest test_smoke_imports.py test_config.py test_cbtd_dia_ban_review.py test_khtd_service.py` = 58+107=165 passed.
+
 ## [2026-09-06] — Lưu dgd_map Hội sở từ file dư nợ HSTD
 - `vbsp_scm.db` kv_store `dgd_map` — lưu cấu hình chắc cho `Hội sở Chi nhánh tỉnh`: 9 xã, 22 điểm giao dịch, 63 thôn/ấp; nguồn kiểm tra từ `pgd_data/hoi_so_chi_nhanh_tinh/hstd_khnv.parquet` kỳ 31/07/2026.
 - `outputs/gom_dgd_hoi_so_20260906/` — giữ file backup trước khi ghi, patch JSON và các CSV kiểm tra dư nợ/ngoại lệ để đối chiếu trước khi gắn CBTD.

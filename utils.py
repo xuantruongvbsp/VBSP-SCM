@@ -686,13 +686,17 @@ def lazy_tabs(labels: list[str], renderers: list, key: str = "lt",
 
     renderer = renderers[sel_idx]
     if callable(renderer):
-        import inspect
-        try:
-            sig = inspect.signature(renderer)
-            n_params = len(sig.parameters)
-        except (ValueError, TypeError):
-            n_params = 0
-        if n_params > 0:
+        code = getattr(renderer, "__code__", None)
+        if code is not None:
+            accepts_container = bool(code.co_argcount or code.co_kwonlyargcount)
+        else:
+            try:
+                sig = inspect.signature(renderer)
+                accepts_container = bool(sig.parameters)
+            except (ValueError, TypeError):
+                accepts_container = False
+
+        if accepts_container:
             renderer(st.container())
         else:
             renderer()

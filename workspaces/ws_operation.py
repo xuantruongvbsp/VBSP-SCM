@@ -146,6 +146,7 @@ def _chuan_hoa_pgd_user(ten_pgd: str | None) -> str | None:
 
 
 
+@st.cache_resource
 def _lazy_tab(name: str):
 
     """Import tab module — dùng sys.modules cache của Python, tự invalidate khi Streamlit hot-reload."""

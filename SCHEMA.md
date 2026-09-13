@@ -1,7 +1,7 @@
 # SCHEMA.md — Sơ đồ Cơ sở Dữ liệu VBSP-SCM
 > Nguồn thực tế: `db.py` → `init_db()`. Cập nhật khi thêm bảng/cột migration.
 > **Tra ở đây trước khi viết query SQL** — không cần đọc db.py.
-> Cập nhật: 2026-07-11
+> Cập nhật: 2026-09-13
 
 ---
 
@@ -19,6 +19,8 @@
 | 8 | `tien_do_ketqua` | Kết quả từng xã/PGD | FK → tien_do_task.id, UNIQUE(task_id, ten_xa) |
 | 9 | `hstd_snapshot` | Snapshot HSTD theo kỳ | UNIQUE(ky, ten_pgd, ma_ct, nguon_von) |
 | 9a | `uy_thac_snapshot` | Snapshot ủy thác đa chiều | UNIQUE theo kỳ/cấp/PGD/xã/Hội/Tổ |
+| 9b | `thon_snapshot` | Snapshot HSTD theo địa bàn gốc | UNIQUE theo kỳ/PGD/mã thôn/xã/thôn |
+| 9c | `cbtd_to_tkvv_snapshot` | Snapshot chất lượng Tổ TK&VV theo CBTD | UNIQUE(ky, ma_cb) |
 | 10 | `nq11_snapshot` | Snapshot NQ11 theo kỳ | UNIQUE(ky, ten_pgd) |
 | 11 | `gqvl_snapshot` | Snapshot GQVL theo kỳ | UNIQUE(ky, ten_pgd) |
 | 12 | `cdtotkvv_snapshot` | Snapshot chất lượng tổ TKV | UNIQUE(ky, ten_pgd) |
@@ -225,6 +227,54 @@ created_by   TEXT    NOT NULL DEFAULT 'system'
 UNIQUE(ky, cap_tong_hop, ten_pgd, ten_xa, dvut, ten_to)
 ```
 > Tự tạo sau merge HSTD. Lưu riêng từng cấp tổng hợp để số KH/Tổ dùng `nunique()` đúng cấp, không cộng dồn từ cấp dưới.
+
+---
+
+### 9b. `thon_snapshot`
+```sql
+id              INTEGER PRIMARY KEY AUTOINCREMENT
+ky              TEXT    NOT NULL
+ten_pgd         TEXT    NOT NULL
+ma_thon         TEXT    NOT NULL DEFAULT ''
+ten_xa          TEXT    NOT NULL
+ten_thon        TEXT    NOT NULL
+tong_du_no      REAL    NOT NULL DEFAULT 0
+du_no_th        REAL    NOT NULL DEFAULT 0
+du_no_qh        REAL    NOT NULL DEFAULT 0
+cho_vay_thang   REAL    NOT NULL DEFAULT 0
+thu_no_thang    REAL    NOT NULL DEFAULT 0
+cho_vay_nam     REAL    NOT NULL DEFAULT 0
+thu_no_nam      REAL    NOT NULL DEFAULT 0
+no_den_han_mon  INTEGER NOT NULL DEFAULT 0
+no_den_han_goc  REAL    NOT NULL DEFAULT 0
+so_mon_3m_khd   INTEGER NOT NULL DEFAULT 0
+so_mon_rui_ro   INTEGER NOT NULL DEFAULT 0
+ngay_so_lieu    TEXT
+created_at      TEXT    NOT NULL DEFAULT (datetime('now','localtime'))
+created_by      TEXT    NOT NULL DEFAULT 'system'
+UNIQUE(ky, ten_pgd, ma_thon, ten_xa, ten_thon)
+```
+> Lưu chiều địa bàn gốc sau merge HSTD. Khi xem lịch sử theo CBTD, ưu tiên gán lại bằng `(PGD, Mã thôn)` và chỉ fallback tên xã/thôn khi khóa duy nhất; không đóng băng phân công CBTD trong snapshot.
+
+---
+
+### 9c. `cbtd_to_tkvv_snapshot`
+```sql
+id          INTEGER PRIMARY KEY AUTOINCREMENT
+ky          TEXT    NOT NULL
+ma_cb       TEXT    NOT NULL
+ho_ten      TEXT    NOT NULL DEFAULT ''
+pgd         TEXT    NOT NULL DEFAULT ''
+so_to       INTEGER NOT NULL DEFAULT 0
+so_tot      INTEGER NOT NULL DEFAULT 0
+so_kha      INTEGER NOT NULL DEFAULT 0
+so_tb       INTEGER NOT NULL DEFAULT 0
+so_yeu      INTEGER NOT NULL DEFAULT 0
+created_at  TEXT    NOT NULL DEFAULT (datetime('now','localtime'))
+created_by  TEXT    NOT NULL DEFAULT 'system'
+UNIQUE(ky, ma_cb)
+```
+> Đóng băng số lượng và xếp loại Tổ TK&VV theo CBTD tại từng kỳ để tính chênh lệch tháng trước và 31/12 năm trước.
 
 ---
 

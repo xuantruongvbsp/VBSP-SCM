@@ -97,6 +97,7 @@ def mock_snapshot_services():
          patch("snapshot_service.luu_uy_thac_snapshot", return_value=_ok), \
          patch("snapshot_service.luu_gqvl_snapshot", return_value=_ok), \
          patch("snapshot_service.luu_nq11_snapshot", return_value=_ok), \
+         patch("snapshot_service.luu_thon_snapshot", return_value=_ok), \
          patch("snapshot_service.luu_cdtotkvv_snapshot", return_value=_ok):
         yield
 
@@ -775,6 +776,7 @@ class TestMergeBaselineUyThacSnapshot:
 
         mock_snap = MagicMock(thanh_cong=True, thong_bao="ok")
         mock_uy_thac = MagicMock(thanh_cong=True, thong_bao="ok")
+        mock_thon = MagicMock(thanh_cong=True, thong_bao="ok")
         prog_mock = MagicMock()
 
         with patch.object(svc.st, "progress", return_value=prog_mock), \
@@ -786,13 +788,17 @@ class TestMergeBaselineUyThacSnapshot:
              patch.object(svc, "excel_to_parquet", return_value=df_mau), \
              patch.object(svc.db, "ghi_audit"), \
              patch("snapshot_service.luu_snapshot", return_value=mock_snap) as p_snap, \
-             patch("snapshot_service.luu_uy_thac_snapshot", return_value=mock_uy_thac) as p_uy_thac:
+             patch("snapshot_service.luu_uy_thac_snapshot", return_value=mock_uy_thac) as p_uy_thac, \
+             patch("snapshot_service.luu_thon_snapshot", return_value=mock_thon) as p_thon:
             kq = svc.merge_baseline_toan_cn("hstd", nam)
 
         assert kq.thanh_cong is True
         p_snap.assert_called_once()
         p_uy_thac.assert_called_once()
+        p_thon.assert_called_once()
+        assert p_snap.call_args.kwargs["ky"] == ky_baseline
         assert p_uy_thac.call_args.kwargs["ky"] == ky_baseline
+        assert p_thon.call_args.kwargs["ky"] == ky_baseline
 
 
 # ══════════════════════════════════════════════════════════════════════════════

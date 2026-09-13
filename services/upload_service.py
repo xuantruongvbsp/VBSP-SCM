@@ -1324,17 +1324,42 @@ def _merge_du_lieu_toan_cn_impl(
     _snap_cache_path = cache_path
 
     if loai == "hstd":
+        try:
+            # Resolve callable trước khi tạo thread: test mock được giữ trong closure,
+            # không rơi về hàm thật nếu fixture kết thúc trước khi thread chạy.
+            from snapshot_service import (
+                _ky_tu_df as _ky_hstd,
+                luu_snapshot as _luu_snap,
+                luu_uy_thac_snapshot as _luu_uy_thac_snap,
+                luu_thon_snapshot as _luu_thon_snap,
+            )
+        except Exception as e:
+            logger.error("auto-snapshot HSTD: không nạp được service — %s", e, exc_info=True)
+            return KetQuaUpload(
+                True,
+                (
+                    f"✅ Đã gộp **{loai.upper()}** toàn Chi nhánh: "
+                    f"**{len(pgd_da_merge)}** đơn vị · **{fmt_so(len(df_toan_cn))}** dòng"
+                    + (f" ⚠️ {len(pgd_loi)} đơn vị lỗi" if pgd_loi else "")
+                ),
+                cache_path,
+            )
+
         def _snap_bg() -> None:
             df_snap = None
             try:
-                from snapshot_service import (
-                    _ky_tu_df as _ky_hstd,
-                    luu_snapshot as _luu_snap,
-                    luu_uy_thac_snapshot as _luu_uy_thac_snap,
-                )
                 df_snap = pd.read_parquet(_snap_cache_path, engine="pyarrow")
-                _luu_snap(df_snap, _snap_user)
-                _luu_uy_thac_snap(df_snap, _snap_user)
+                for _ten_snap, _ket_qua in (
+                    ("HSTD", _luu_snap(df_snap, _snap_user)),
+                    ("Ủy thác", _luu_uy_thac_snap(df_snap, _snap_user)),
+                    ("Thôn", _luu_thon_snap(df_snap, _snap_user)),
+                ):
+                    if not _ket_qua.thanh_cong:
+                        logger.warning(
+                            "auto-snapshot %s không thành công — %s",
+                            _ten_snap,
+                            _ket_qua.thong_bao,
+                        )
             except Exception as e:
                 logger.error("auto-snapshot HSTD background thread thất bại — %s", e, exc_info=True)
             # Sau HSTD snapshot, thử lưu CDTOTKVV snapshot cùng kỳ
@@ -1347,6 +1372,15 @@ def _merge_du_lieu_toan_cn_impl(
                 _df_cdtot = _doc_cdtot()
                 if _df_cdtot is not None and not _df_cdtot.empty:
                     _luu_cdtot(_df_cdtot, _ky_str, _snap_user)
+                # Lưu thêm xếp loại Tổ TK&VV theo từng CBTD (đóng băng theo kỳ)
+                try:
+                    from data.khtd import doc_cbtd as _doc_cbtd
+                    from snapshot_service import luu_cbtd_to_tkvv_snapshot as _luu_cbtd_tot
+                    _cbtd = _doc_cbtd()
+                    if _cbtd and _df_cdtot is not None and not _df_cdtot.empty:
+                        _luu_cbtd_tot(_df_cdtot, _cbtd, db.doc_dgd_map(), _ky_str, _snap_user)
+                except Exception as e:
+                    logger.error("auto-snapshot CBTD Tổ TK&VV background thread thất bại — %s", e, exc_info=True)
             except Exception as e:
                 logger.error("auto-snapshot CDTOTKVV background thread thất bại — %s", e, exc_info=True)
             try:
@@ -1512,9 +1546,10 @@ def merge_baseline_toan_cn(loai: str, nam: int) -> KetQuaUpload:
         elif loai == "hstd":
             from snapshot_service import (
                 luu_snapshot as _luu_snap,
+                luu_thon_snapshot as _luu_thon_snap,
                 luu_uy_thac_snapshot as _luu_uy_thac_snap,
             )
-            kq_snap = _luu_snap(df_all, username)
+            kq_snap = _luu_snap(df_all, username, ky=ky_baseline)
             if kq_snap.thanh_cong:
                 logger.info("merge_baseline_toan_cn: HSTD snapshot %s OK", ky_baseline)
             else:
@@ -1524,6 +1559,11 @@ def merge_baseline_toan_cn(loai: str, nam: int) -> KetQuaUpload:
                 logger.info("merge_baseline_toan_cn: Uy thac snapshot %s OK", ky_baseline)
             else:
                 logger.warning("merge_baseline_toan_cn: Uy thac snapshot lỗi — %s", kq_uy_thac.thong_bao)
+            kq_thon = _luu_thon_snap(df_all, username, ky=ky_baseline)
+            if kq_thon.thanh_cong:
+                logger.info("merge_baseline_toan_cn: Thon snapshot %s OK", ky_baseline)
+            else:
+                logger.warning("merge_baseline_toan_cn: Thon snapshot lỗi — %s", kq_thon.thong_bao)
     except Exception as e:
         logger.error("merge_baseline_toan_cn: lỗi tạo snapshot %s — %s", loai, e, exc_info=True)
 

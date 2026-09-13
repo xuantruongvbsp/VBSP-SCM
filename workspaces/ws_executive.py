@@ -45,7 +45,14 @@ from utils import (
 )
 from services.excel_service import ExcelReport, xuat_excel_chuyen_nghiep, ten_file_xuat as excel_ten_file
 from pdf_service import xuat_pdf_bao_cao, xuat_pdf, kiem_tra_pdf_dependency, render_huong_dan
-from snapshot_service import doc_snapshot, doc_snapshot_range, danh_sach_ky, ky_baseline
+from snapshot_service import (
+    danh_sach_ky,
+    doc_snapshot,
+    doc_snapshot_range,
+    ky_baseline,
+    ky_thang_truoc,
+    snapshot_la_cuoi_thang,
+)
 from services.hhi_service import tinh_hhi, tinh_hhi_breakdown, danh_gia_hhi
 from components.delta_card import delta_card, kpi_row
 
@@ -218,9 +225,11 @@ def _kpi_tang_truong(df_full: pd.DataFrame) -> None:
     ds_ky = danh_sach_ky()
     prev = None
     if ds_ky:
-        _ky_prev = ky_baseline(ds_ky, ds_ky[0]) or (ds_ky[1] if len(ds_ky) > 1 else None)
+        _ky_prev = ky_thang_truoc(ds_ky, ds_ky[0])
         if _ky_prev and _ky_prev != ds_ky[0]:
             df_p = doc_snapshot(_ky_prev)
+            if not snapshot_la_cuoi_thang(df_p, _ky_prev):
+                df_p = pd.DataFrame()
             cn = df_p[df_p["ten_pgd"] == "__CN__"] if not df_p.empty else pd.DataFrame()
             if not cn.empty:
                 prev = cn.iloc[0]
@@ -1339,6 +1348,7 @@ def _build_exec_items(df_full, role: str, username: str, **kwargs) -> list:
         {"group": "Kiểm soát",       "label": "Xử lý Rủi ro",             "fn": lambda: _lazy_tab("tab_xu_ly_rui_ro").render(None, df=df_full, role=role, username=username)},
         {"group": "Báo cáo",         "label": "So sánh kỳ",                 "fn": lambda: _lazy_tab("tab_so_sanh_ky").render(None, df=df_full, df_full=df_full, role=role, username=username)},
         {"group": "Báo cáo",         "label": "📅 Báo cáo định kỳ",       "fn": lambda: _lazy_tab("tab_bao_cao_dinh_ky").render(None, role=role, username=username)},
+        {"group": "Báo cáo",         "label": "📊 Báo cáo Chất lượng tín dụng", "fn": lambda: _lazy_tab("tab_mau03_khnv").render(None, **kwargs)},
         {"group": "Báo cáo",         "label": "Xuất PDF báo cáo",           "fn": lambda: _render_pdf_section(df_full, username)},
         {"group": "Hệ thống",        "label": "Hướng dẫn",                  "fn": lambda: render_huong_dan()},
     ]

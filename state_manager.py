@@ -174,6 +174,7 @@ class SCMStateManager:
                 "ws_mgmt_jump": None,
                 "ws_op_nhom": "",
                 "ws_op_jump_tab": None,
+                "ws_op_menu": "",
             },
             "_scm_downloads": {},
             "_scm_temp": {},
@@ -192,7 +193,13 @@ class SCMStateManager:
     def _nav_ns(self) -> dict:
         return st.session_state.setdefault(
             "_scm_navigation",
-            {"ws_mgmt_menu": "", "ws_mgmt_jump": None, "ws_op_nhom": "", "ws_op_jump_tab": None},
+            {
+                "ws_mgmt_menu": "",
+                "ws_mgmt_jump": None,
+                "ws_op_nhom": "",
+                "ws_op_jump_tab": None,
+                "ws_op_menu": "",
+            },
         )
 
     # ── Domain: Filters (typed properties) ────────────────────────────

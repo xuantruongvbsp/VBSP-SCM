@@ -56,6 +56,46 @@ def xa_short(ten_xa_full: str) -> str:
     return s
 
 
+def ds_thon_cua_entry(entry: Any) -> list[str]:
+    """Danh sách tên thôn/ấp của một entry dgd_map (chấp nhận list cũ hoặc dict mới)."""
+    if isinstance(entry, dict):
+        raw = entry.get("thon", [])
+    elif isinstance(entry, list):
+        raw = entry
+    else:
+        raw = []
+    return [str(t).strip() for t in (raw or []) if str(t).strip() and str(t).strip().lower() != "nan"]
+
+
+def ds_ma_thon_cua_entry(entry: Any) -> list[str]:
+    """Danh sách MÃ thôn của một entry dgd_map — khóa chính để join HSTD.
+
+    Entry schema mới: {"thon": [...], "ma_thon": [...], "ngay_gdxa": int|None}.
+    Entry cũ (list / dict không có ma_thon) trả về [].
+    """
+    if not isinstance(entry, dict):
+        return []
+    raw = entry.get("ma_thon", [])
+    if not isinstance(raw, (list, tuple)):
+        return []
+    return [str(t).strip() for t in raw if str(t).strip()]
+
+
+def entry_giu_nguyen_meta(thon_moi: list, entry_cu: Any = None) -> dict:
+    """Tạo entry mới từ danh sách thôn, GIỮ nguyên ma_thon / ngay_gdxa của entry cũ.
+
+    Dùng ở mọi điểm ghi dgd_map để UI sửa tên thôn không làm mất khóa mã thôn.
+    """
+    cu = entry_cu if isinstance(entry_cu, dict) else {}
+    out: dict[str, Any] = {"thon": [str(t).strip() for t in (thon_moi or []) if str(t).strip()]}
+    ma_cu = ds_ma_thon_cua_entry(cu)
+    if ma_cu:
+        out["ma_thon"] = ma_cu
+    if cu.get("ngay_gdxa") is not None:
+        out["ngay_gdxa"] = cu.get("ngay_gdxa")
+    return out
+
+
 def khop_xa_dgd(ten_xa_full: str, dgd_xa: str) -> bool:
     """So sánh tên xã đầy đủ (từ PGD_XA_MAP) với tên xã ngắn trong DGD_DANH_SACH."""
     return xa_short(ten_xa_full).strip().lower() == str(dgd_xa).strip().lower()
@@ -204,11 +244,8 @@ def pool_thon_cho_xa(
     xa_map = (dgd_map or {}).get(ten_pgd, {}).get(ten_xa, {})
     if not isinstance(xa_map, dict):
         xa_map = {}
-    for thon_list in xa_map.values():
-        for t in thon_list or []:
-            s = str(t).strip()
-            if s and s.lower() != "nan":
-                pool.add(s)
+    for entry in xa_map.values():
+        pool.update(ds_thon_cua_entry(entry))
 
     pool |= _gop_thon_tu_bang(df, ten_pgd, ten_xa)
 

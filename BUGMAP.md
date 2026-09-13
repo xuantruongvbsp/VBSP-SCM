@@ -213,6 +213,44 @@
 
 ## B. Streamlit UI
 
+### B99 — Mẫu 03/KHNV chèn text động trực tiếp vào `st.html()`
+| | |
+|---|---|
+| **File** | `tabs/tab_mau03_khnv.py` → `_render_bang_html()` và header report |
+| **Dấu hiệu** | Tên đơn vị hoặc ngày số liệu có ký tự HTML như `<`, `>`, `&` có thể làm bảng/header hiển thị sai cấu trúc hoặc lẫn markup ngoài ý muốn. |
+| **Nguyên nhân** | HTML bảng được ghép thủ công, `td()` và header report chèn text động trực tiếp thay vì escape. |
+| **Fix** | Thêm `_html_text()` dùng `html.escape`; escape mặc định cho text trong ô/header, chỉ cho phép `raw_html=True` với span delta do hệ thống tự sinh. |
+| **Test** | `tests/test_tab_mau03_khnv.py::test_render_bang_html_escape_text_dong_va_giu_span_delta` |
+| **Ngày fix** | 2026-09-13 |
+
+### B83 — Mẫu 03/KHNV thiếu mốc so sánh nhưng delta bị tính như so với 0
+| | |
+|---|---|
+| **File** | `tabs/tab_mau03_khnv.py` |
+| **Dấu hiệu** | Nếu thiếu snapshot tháng liền trước hoặc thiếu baseline 31/12, các cột chênh lệch có thể hiện số tăng rất lớn thay vì `—`; nếu chỉ còn kỳ cũ như `2026-04`, hệ thống vẫn dùng nó làm "tháng trước" của `2026-07`. |
+| **Nguyên nhân** | `_tim_ba_ky()` fallback sang `ds_ky[1]` khi thiếu tháng liền trước; `_build_report_data()` dùng row so sánh rỗng `{}` như số 0. |
+| **Fix** | Chỉ nhận đúng tháng liền trước; thiếu mốc so sánh thì delta trả `pd.NA` và UI hiển thị `—`; thêm regression test cho cả chọn kỳ và tính delta. |
+| **Test** | `tests/test_tab_mau03_khnv.py`; smoke `tests/test_smoke_imports.py -k "tab_mau03_khnv"` |
+| **Ngày fix** | 2026-09-13 |
+
+### B82 — Báo cáo Chất lượng tín dụng còn mô tả màu tăng/giảm ngược
+| | |
+|---|---|
+| **File** | `tabs/tab_mau03_khnv.py` |
+| **Dấu hiệu** | Màu delta đã đổi sang tăng = xanh, giảm = đỏ nhưng docstring/metadata/caption vẫn còn mô tả theo quy ước cũ hoặc hiện ký tự lỗi `�`. |
+| **Nguyên nhân** | Lần đổi màu trước chỉ xử lý chính `_fmt_delta()` và một phần ghi chú UI, còn sót text mô tả nghiệp vụ cũ trong đầu file và sheet metadata Excel. |
+| **Fix** | Chuẩn hóa toàn bộ mô tả thành: chênh lệch dương/tăng = xanh lá, chênh lệch âm/giảm = đỏ; sửa caption hiển thị `🟢 Tăng · 🔴 Giảm`. |
+| **Ngày fix** | 2026-09-13 |
+
+### B81 — Chuyển tab chậm vì navigation ghi DB trên mỗi rerun
+| | |
+|---|---|
+| **File** | `workspaces/ws_management.py`, `workspaces/ws_operation.py`, `utils.py`, `state_manager.py` |
+| **Dấu hiệu** | Bấm chuyển tab/menu trong VBSP-SCM có cảm giác khựng, nhất là phân hệ Phòng KH-NV có nhiều dữ liệu đang nằm trong session. |
+| **Nguyên nhân** | Mỗi lần Streamlit rerun, `ws_management.render()` đọc `kv_store` rồi có thể ghi `kv_store` + `audit_log` để lưu menu đang chọn; một số helper điều hướng còn làm thêm overhead nhỏ như import loader và `inspect.signature()` trong rerun thường. |
+| **Fix** | Chỉ restore menu từ `kv_store` một lần khi session chưa có state; giữ chuyển tab trong `SCMStateManager` session-only; cache `_lazy_tab()` ở PGD bằng `st.cache_resource`; `lazy_tabs()` dùng `__code__` fast path trước khi fallback `inspect.signature()`. |
+| **Ngày fix** | 2026-09-12 |
+
 ### B80 — Ngày số liệu Điện báo không auto-fill theo tên file sau upload
 | | |
 |---|---|
@@ -621,6 +659,15 @@
 | **Nguyên nhân** | Streamlit 1.36+ không render HTML qua `st.markdown(..., unsafe_allow_html=True)` đáng tin cậy trong một số context — cần dùng `st.html()` |
 | **Fix** | Thay `st.markdown(f"""...""", unsafe_allow_html=True)` bằng `st.html(f"""...""")` |
 | **Ngày fix** | 2026-07-11 |
+
+### B8 — Báo cáo Chất lượng tín dụng: `<tbody>` bảng 15 cột bị escape thành chuỗi HTML thô
+| | |
+|---|---|
+| **File** | `tabs/tab_mau03_khnv.py` → `_render_bang_html()` dòng ~310 |
+| **Dấu hiệu** | Báo cáo có tiêu đề + 4 ô thông tin (kỳ 2026-07...) nhưng 23 dòng số liệu (Hội sở + 21 PGD + tổng) hiển thị thành chuỗi HTML nguồn (`<tbody><tr>...`) thay vì bảng |
+| **Nguyên nhân** | `st.markdown(..., unsafe_allow_html=True)` với f-string nhiều dòng có thụt lề/dòng trống → CommonMark (Streamlit 1.60) hiểu nhầm thành code block, chỉ render được `<thead>` còn `<tbody>` bị escape |
+| **Fix** | Thay bằng `st.html(f"""...""")` — bypass Markdown parser (cùng pattern B7) |
+| **Ngày fix** | 2026-09-12 |
 
 ### B6 — `cannot import name 'render_nhap_cn' from partially initialized module 'tabs.tab_khtd_nhap'`
 | | |
@@ -1130,6 +1177,46 @@
 ---
 
 ## D. Database / kv_store
+
+### D16 — Regression snapshot CBTD không theo kịp migration 006 và có thể đếm trùng Tổ
+| | |
+|---|---|
+| **File** | `snapshot_service.py` → `luu_cbtd_to_tkvv_snapshot()`, `xoa_snapshot()`; `tests/test_snapshot_service.py`; `tabs/tab_cbtd.py` → `_tao_bang_xep_hang()` |
+| **Dấu hiệu** | Năm test snapshot lỗi `no column named du_no_th` hoặc `no such table: cbtd_to_tkvv_snapshot`; delta tổng có thể thành `NaN`; snapshot Tổ có thể cao hơn bảng hiện tại khi nguồn lặp cùng một Tổ. |
+| **Nguyên nhân** | Fixture SQLite vẫn dùng schema trước migration 006; luồng lưu snapshot chưa khử trùng giống luồng hiển thị; phép ép số dùng biểu thức `value or 0` không thay được `NaN`; thông báo xóa snapshot hard-code sáu bảng. |
+| **Fix** | Đồng bộ fixture với migration 006; khử trùng theo `(mã Tổ, xã)` trước khi đếm; chuẩn hóa `NaN` về 0 khi lập bảng delta; dùng `len(_SNAPSHOT_TABLES)` và kiểm tra xóa đủ bảy bảng. |
+| **Test** | `tests/test_snapshot_service.py::TestThonSnapshot`; `TestThonSnapshotMigration::test_migration_006_them_chi_tieu_va_bang_cbtd_to_tkvv_idempotent`; `TestCbtdToTkvvSnapshot::test_luu_doc_khu_trung_to_va_dem_xep_loai`; `TestXoaSnapshot`; `tests/test_tab_cbtd_add_form.py::test_tao_bang_xep_hang_sap_giam_va_tinh_delta_khong_lan_nan` |
+| **Ngày fix** | 2026-09-13 |
+
+### D15 — Test merge HSTD ghi snapshot thôn giả vào DB thật
+| | |
+|---|---|
+| **File** | `tests/test_merge_du_lieu_toan_cn.py` → fixture `mock_snapshot_services()` |
+| **Dấu hiệu** | Chạy pytest tạo `thon_snapshot` và audit với `created_by=test_user/user1`, địa bàn giả như `PGD Concurrent` trong `vbsp_scm.db` thật. |
+| **Nguyên nhân** | Fixture autouse đã mock năm hàm snapshot cũ nhưng chưa mock `luu_thon_snapshot()` mới; daemon thread chạy sau merge nên thoát khỏi mock DB cục bộ và ghi vào kết nối production. |
+| **Fix** | Bổ sung patch `snapshot_service.luu_thon_snapshot` trong fixture autouse để toàn bộ background snapshot đều bị chặn trong test merge. |
+| **Test** | `tests/test_merge_du_lieu_toan_cn.py::TestMergeConcurrency::test_merge_dong_thoi_2_luong_khong_corrupt_file`; đối chiếu số audit `luu_thon_snapshot` trước/sau test không tăng. |
+| **Ngày fix** | 2026-09-13 |
+
+### D14 — Snapshot thôn ghi đè địa bàn trùng tên và bỏ sót hồ sơ thiếu tên thôn
+| | |
+|---|---|
+| **File** | `migrations/003_thon_snapshot.py`, `migrations/004_ensure_thon_snapshot.py`, `migrations/005_thon_snapshot_identity.py`; `snapshot_service.py` → `luu_thon_snapshot()`; `services/cbtd_dia_ban_service.py` → `tong_hop_hstd_theo_thon()`, `tong_hop_thon_snapshot_theo_cbtd()` |
+| **Dấu hiệu** | Hai PGD có cùng tên xã/thôn bị gộp hoặc ghi đè; hồ sơ có `Mã thôn` nhưng trống `Tên thôn` không gán lại được CBTD. Lưu lại một kỳ còn có thể giữ dòng địa bàn đã biến mất; migration thử nghiệm xóa thẳng bảng `cbtd_snapshot` legacy. |
+| **Nguyên nhân** | Schema chỉ dùng `UNIQUE(ky, ten_xa, ten_thon)` và không lưu `ten_pgd`/`ma_thon`; phép gán lịch sử dùng tên địa bàn toàn Chi nhánh. Luồng ghi dùng upsert từng dòng thay vì thay toàn bộ kỳ. |
+| **Fix** | Định danh snapshot bằng kỳ + PGD + mã/tên địa bàn; migration version 5 rebuild trong savepoint và bảo toàn dữ liệu cũ với PGD `__UNKNOWN__`; giữ bảng CBTD legacy. Gán lại qua `gan_cbtd_vao_df()` để ưu tiên `(PGD, Mã thôn)`, fallback tên chỉ khi duy nhất; lưu kỳ bằng delete+insert cùng transaction và rollback khi lỗi. |
+| **Test** | `tests/test_snapshot_service.py::TestThonSnapshot`; `tests/test_snapshot_service.py::TestThonSnapshotMigration`; `tests/test_cbtd_dia_ban_review.py::test_gan_cbtd_khong_lan_hai_pgd_trung_ma_va_ten_thon`; `test_snapshot_thon_cu_thieu_pgd_chi_gan_khi_key_duy_nhat` |
+| **Ngày fix** | 2026-09-13 |
+
+### D13 — Lưu lại HSTD snapshot cùng kỳ còn sót dòng chi tiết cũ
+| | |
+|---|---|
+| **File** | `snapshot_service.py` → `luu_snapshot()` |
+| **Dấu hiệu** | Một kỳ có nhiều `ngay_so_lieu`; các tổ hợp PGD/chương trình/nguồn vốn đã biến mất khỏi file mới vẫn còn trong `hstd_snapshot`, làm báo cáo chi tiết có thể cộng dữ liệu cũ. |
+| **Nguyên nhân** | `INSERT OR REPLACE` chỉ thay khóa còn xuất hiện trong lần lưu mới, không loại các khóa cũ của cùng kỳ. |
+| **Fix** | Tổng hợp payload trước, sau đó `DELETE WHERE ky=?` và `executemany(INSERT...)` trong cùng transaction; lỗi insert sẽ rollback để giữ nguyên snapshot trước đó. Ngày số liệu được lưu theo từng nhóm thay vì lấy max toàn Chi nhánh. |
+| **Test** | `tests/test_snapshot_service.py::TestLuuSnapshot::test_luu_lai_cung_ky_xoa_dong_chi_tiet_khong_con`; `test_luu_lai_cung_ky_rollback_neu_insert_loi`; `test_luu_ngay_so_lieu_theo_tung_pgd_de_phat_hien_file_giua_thang` |
+| **Ngày fix** | 2026-09-13 |
 
 ### D10 — Metadata Điện báo PGD có thể ghi nhầm vào key Chi nhánh
 | | |
@@ -3158,6 +3245,15 @@ val = pd.to_numeric(df[COT_X], errors="coerce").sum() if COT_X in df.columns els
 | **Test** | `tests/test_tab_hhi.py::test_phan_nguon_von_ma_ct_thap_phan_khong_crash_va_giu_logic_cu` |
 | **Ngày fix** | 2026-08-02 |
 
+### C39 — `Invalid value '' for dtype 'int64'` khi gán chuỗi rỗng vào cột STT (Báo cáo Chất lượng tín dụng)
+| | |
+|---|---|
+| **File** | `tabs/tab_mau03_khnv.py` → `_xuat_excel_mau03()` |
+| **Dấu hiệu** | Render "📊 Báo cáo Chất lượng tín dụng" crash với `ValueError: Invalid value '' for dtype 'int64'` khi nhấn tải Excel. |
+| **Nguyên nhân** | `df_xl.insert(0, "STT", range(1, len+1))` tạo cột `int64`, sau đó `df_xl.loc[index_cuối, "STT"] = ""` gán chuỗi rỗng cho ô dòng tổng → pandas int64 từ chối chuỗi rỗng. |
+| **Fix** | Dựng trực tiếp `stt_vals = list(range(1, len(df_xl))) + [""]` rồi `insert` — cột trở thành object, dòng tổng giữ STT rỗng hợp lệ. |
+| **Ngày fix** | 2026-09-12 |
+
 ### J29 — Pre-commit phụ thuộc PATH và xử lý đối số file chưa an toàn
 | | |
 |---|---|
@@ -4357,6 +4453,66 @@ def _to_int(val, default=0):
 
 ---
 
+### C55 — `pool_thon_cho_xa()` lặp trực tiếp entry dict → chỉ lấy key `"thon"`, mất hoàn toàn danh sách thôn
+| | |
+|---|---|
+| **File** | `data/dgd_helpers.py` → `pool_thon_cho_xa()` block đọc dgd_map |
+| **Dấu hiệu** | Sau khi nâng schema dgd_map entry thành dict `{"thon": [...], "ma_thon": [...], "ngay_gdxa": int}` (Hội sở CN), PGD vẫn hoạt động OK nhưng màn quản lý ĐGD HỘI SỞ hiển thị "Pool thôn trống" → user gán ĐGD cho xã → dư nợ không khớp; `pool_thon` về ~20-80% so với danh sách thực tế. |
+| **Nguyên nhân** | Code cũ viết khi entry vẫn là list `[thôn...]` → `for thon in entry` → chuỗi thôn OK. Entry trở thành dict → `for thon in {"thon": [..]}` → lặp TRỰC TIẾP dict keys → lấy key `"thon"` (thuộc kiểu string `"thon"`) làm tên thôn → POOL CHỈ CÓ 1 PHẦN TỬ LÀ CHUỖI "thon" → tất cả thôn thực đều biến mất khỏi pool. |
+| **Fix** | Tạo accessor `ds_thon_cua_entry(entry)` nhận list hoặc dict → luôn trả list tên thôn chuẩn; thay thế `for entry in xa_map.values(): pool.update(entry)` bằng `pool.update(ds_thon_cua_entry(entry))`. Đồng thời kiểm tra toàn repo 100% call site đọc dgd_map entry đều dùng accessor. |
+| **Test** | Smoke compile; tạo entry dạng dict `{"thon":["Thôn A","Thôn B"],"ma_thon":["460001","460002"]}` → `pool_thon_cho_xa` trả về đầy đủ 2 chuỗi tên thôn không chứa key rác "thon"/"ma_thon". Grep: `data/dgd_helpers.py` chỉ còn 1 nơi tạo entry mới (line sau fix), mọi nơi khác dùng accessor. |
+| **Ngày fix** | 2026-09-06 |
+
+---
+
+### C56 — `tab_bao_cao_giao_ban_pgd.py` đọc dgd_map entry dạng dict như list → lọc thôn báo cáo giao ban bị rỗng + KeyError
+| | |
+|---|---|
+| **File** | `tabs/tab_bao_cao_giao_ban_pgd.py` → block lọc DF theo ĐGD khi user chọn xã/ĐGD để tách báo cáo giao ban từng Điểm GD (dòng ~290 cũ) |
+| **Dấu hiệu** | Sau khi Hội sở CN chạy script lưu entry dạng dict, mở tab Báo cáo giao ban PGD → chọn 1 ĐGD Hội sở có rõ ma_thon → bảng kết quả = 0 dòng; kiểm tra console: không lỗi rõ ràng nhưng `ds_thon_dgd` = `['t', 'h', 'o', 'n']` (iterate dict keys character by character). PGD cũ vẫn OK (entry list). |
+| **Nguyên nhân** | Code cũ `ds_thon_dgd = dgd_map[pgd][xa][ten_dgd][:]` rồi dùng trực tiếp `isin(ds_thon_dgd)`; nếu entry là dict → Python iterate dict trả về list KEYS → CHUỖI "thon","ma_thon" → match 0 dòng. Đồng thời bỏ qua hoàn toàn cột Mã thôn (khóa chính cho HSTD Hội sở). |
+| **Fix** | Dùng `ds_thon_cua_entry(entry_dgd)` lấy danh sách tên thôn, `ds_ma_thon_cua_entry(entry_dgd)` lấy mã thôn; build mask thôn = mask(Tên thôn ∈ ds_thon) OR mask(Mã thôn chuẩn hóa ∈ ds_ma). Mask kết quả OR 2 nhánh → 100% Hội sở map theo mã thôn cũng khớp dù tên thôn sai hoặc trống. |
+| **Test** | Smoke compile; tạo entry dict Hội sở 26 mẫu với ma_thon; mask `isin(ds_thon_dgd) OR ma_s.isin(ds_ma_dgd)`; verify: mã 46005812 (Tam Hiệp / Khu phố 12) thuộc Tam Hiệp, KHÔNG thuộc Tân Mai dù tên thôn trống. |
+| **Ngày fix** | 2026-09-06 |
+
+---
+
+### C57 — Cross-check màn Gán thôn tính nhầm dư nợ xã thành dư nợ cả PGD
+| | |
+|---|---|
+| **File** | `tabs/tab_quan_ly_dgd.py` → `_tinh_bao_phu_dgd()` và `_render_gan_thon()` |
+| **Dấu hiệu** | Trong tab Quản lý ĐGD → Gán Thôn/Ấp, chọn một xã nhưng KPI "Dư nợ xã" / "% dư nợ có ĐGD" có thể phình lên như tổng dư nợ toàn PGD; danh sách mã thôn chưa xác định cũng lẫn mã thôn của xã khác. |
+| **Nguyên nhân** | Helper coverage chỉ nhận `pgd_filter`; `_render_gan_thon()` truyền dgd_map đã giới hạn một xã nhưng DataFrame HSTD vẫn lọc theo PGD, nên mọi mã thôn ngoài xã đang chọn đều bị tính là chưa thuộc ĐGD. |
+| **Fix** | Thêm tham số `xa_filter`; lọc HSTD theo `COT_TEN_XA` trước khi tính dư nợ/mã thôn; gọi từ `_render_gan_thon(..., xa_filter=chon_xa)`. Đồng thời đổi fallback mask PGD sang `pd.Series(True, index=df_h.index)` để tránh lệch index khi DataFrame không còn RangeIndex. |
+| **Test** | Compile `tabs/tab_quan_ly_dgd.py`; smoke import module. Kiểm tra logic: khi truyền dgd_map một xã, helper cũng chỉ tính các dòng HSTD của đúng xã đó. |
+| **Ngày fix** | 2026-09-06 |
+
+---
+
+### C58 — Mode Đổi mã CBTD gọi `_validate_ma_cb(bo_qua_ma=...)` sai signature
+| | |
+|---|---|
+| **File** | `tabs/tab_cbtd.py` → `_validate_ma_cb()` và mode `🪪 Đổi mã CBTD` |
+| **Dấu hiệu** | Vào tab CBTD → Quản lý CBTD → Đổi mã CBTD, nhập mã mới hoặc render validate có thể crash `TypeError: _validate_ma_cb() got an unexpected keyword argument 'bo_qua_ma'`. |
+| **Nguyên nhân** | UI rename key mới cần bỏ qua chính mã cũ khi kiểm tra trùng, nhưng helper `_validate_ma_cb()` cũ chỉ nhận `(s, existed)`; code mới gọi keyword `bo_qua_ma` chưa được bổ sung vào signature. |
+| **Fix** | Mở rộng `_validate_ma_cb(s, existed=None, bo_qua_ma=None)`; chỉ báo trùng khi `v in existed and v != bo_qua`. Mode Đổi mã truyền đủ `cbtd_data` và `bo_qua_ma=ma_cu`; mã mới được `.upper()` trước validate/lưu. |
+| **Test** | Compile `tabs/tab_cbtd.py`; smoke import/render `tabs.tab_cbtd`; chạy bộ pytest liên quan. |
+| **Ngày fix** | 2026-09-07 |
+
+---
+
+### C59 — Batch edit CBTD không atomic thật nếu lỗi validate xuất hiện sau vài dòng đầu
+| | |
+|---|---|
+| **File** | `tabs/tab_cbtd.py` → mode `🔄 Sửa hàng loạt` |
+| **Dấu hiệu** | User tick nhiều CBTD rồi áp giá trị hàng loạt; nếu một dòng sau lỗi validate, DB chưa lưu nhưng dict `cbtd_data` trong memory đã có thể bị sửa một phần ở các dòng trước đó trong cùng rerun. |
+| **Nguyên nhân** | Vòng lặp validate vừa tạo `info_moi` vừa gán trực tiếp `cbtd_data[ma] = info_moi`; khi gặp lỗi sau đó mới set `ok_all=False`, phần mutate trước đó đã xảy ra. |
+| **Fix** | Dùng `cbtd_draft = dict(cbtd_data)` trong vòng validate; ghi thay đổi vào draft. Chỉ khi `ok_all` và `da_sua > 0` mới `cbtd_data.clear(); cbtd_data.update(cbtd_draft); luu_cbtd(cbtd_data)`. Checkbox mask cũng đổi sang `.fillna(False).astype(bool)`. |
+| **Test** | Compile `tabs/tab_cbtd.py`; smoke import/render `tabs.tab_cbtd`; chạy bộ pytest liên quan. |
+| **Ngày fix** | 2026-09-07 |
+
+---
+
 ### J80 — Helper `_normalize(None)` crash `TypeError: 'NoneType' object has no attribute 'strip'`
 | | |
 |---|---|
@@ -4474,6 +4630,76 @@ def _to_int(val, default=0):
 | **Fix** | `_parse_dt_series()` parse mixed/DD-MM như cũ, sau đó detect chuỗi `YYYY-MM-DD` hoặc `YYYY/MM/DD` và parse lại phần đó bằng `yearfirst=True`; bảng mới `tong_hop_hstd_theo_cbtd()` dùng helper này cho cả ngày vay và ngày giải ngân đầu tiên. |
 | **Test** | `tests/test_cbtd_dia_ban_review.py::test_tong_hop_hstd_theo_cbtd_cong_so_lieu_tung_can_bo` — kiểm `So_KH_moi_thang` và `So_giai_ngan_thang` tháng 09/2026 từ chuỗi ISO. |
 | **Ngày fix** | 2026-09-06 |
+
+### C60 — Kỳ snapshot/CBTD đảo tháng với ngày ISO có ngày ≤ 12
+| | |
+|---|---|
+| **File** | `snapshot_service.py` → `_parse_date_series()`; `tabs/tab_cbtd.py` → `_ky_hstd_hien_tai()` |
+| **Dấu hiệu** | Ngày số liệu ISO như `2026-07-01` có thể làm kỳ tự động thành `2026-01`; chỉ tiêu tháng, tên file xuất và kỳ snapshot vì vậy lệch sáu tháng. |
+| **Nguyên nhân** | `pd.to_datetime(..., dayfirst=True, format="mixed")` đảo ngày/tháng của chuỗi năm-đầu khi cả ngày và tháng đều ≤ 12. |
+| **Fix** | Nhận diện riêng `YYYY-MM-DD`/`YYYY/MM/DD` và parse lại bằng `yearfirst=True`; Dashboard CBTD dùng chung parser đã chuẩn hóa. |
+| **Test** | `tests/test_snapshot_service.py::TestKyTuDf::test_ngay_dang_iso`; `tests/test_tab_cbtd_add_form.py::test_ky_hstd_hien_tai_lay_tu_ngay_so_lieu_khong_lay_ngay_may` |
+| **Ngày fix** | 2026-09-13 |
+
+---
+
+### B98 — Form Chỉnh sửa CBTD giữ tên/địa bàn của cán bộ chọn trước
+| | |
+|---|---|
+| **File** | `tabs/tab_cbtd.py` → mode `✏️ Chỉnh sửa` ~dòng 1299 |
+| **Dấu hiệu** | Vào `CBTD & Địa bàn` → `Quản lý hồ sơ` → `✏️ Chỉnh sửa`, chọn CBTD khác nhưng ô Họ tên/PGD/ĐGD phụ trách có thể vẫn dính giá trị của CBTD đã chọn trước đó; user sửa tên nhưng vô tình lưu nhầm địa bàn. |
+| **Nguyên nhân** | Các widget trong form sửa dùng key cố định (`cbtd_ten_sua`, `cbtd_pgd_sua`, `cbtd_dgd_sua`), nên Streamlit ưu tiên `session_state` cũ thay vì nạp lại `value/default` từ `info_cu` của CBTD mới. |
+| **Fix** | Tạo `edit_kp` theo mã CBTD đang chọn và dùng cho toàn bộ widget form sửa; riêng multiselect `ĐGD phụ trách` thêm slug PGD vào key để khi đổi `PGD trực thuộc`, danh sách địa bàn reset theo PGD mới và lưu đúng vào cán bộ đang chọn. |
+| **Test** | `tests/test_tab_cbtd_add_form.py::test_cbtd_edit_form_keys_are_scoped_to_selected_cbtd_and_pgd`; `venv\\Scripts\\python.exe -m py_compile tabs\\tab_cbtd.py tests\\test_tab_cbtd_add_form.py` |
+| **Ngày fix** | 2026-09-11 |
+
+---
+
+### J85 — Gán lại biến Series thành scalar rồi index lại → `'int' object is not subscriptable`
+| | |
+|---|---|
+| **File** | `tabs/tab_quan_ly_dgd.py` → `_render_bao_cao_tong_hop_cbtd()` ~dòng 1618-1620 |
+| **Dấu hiệu** | Mở `👔 CBTD & Địa bàn` → sub-tab `📍 Điểm Giao Dịch` báo `❌ Lỗi render 👔 CBTD & Địa bàn: 'int' object is not subscriptable`, toàn bộ nhóm tab trắng. Traceback trỏ vào dòng index `ma_unique[mask_ok]`. |
+| **Nguyên nhân** | Dòng trên gán đè `ma_unique = ma_unique[ma_unique != ""].nunique()` → biến `ma_unique` từ `pd.Series` thành `int`; dòng ngay sau vẫn index `ma_unique[mask_ok]` → `TypeError`. Biến kết quả `ma_unique_ok` lại là dead-code (không dùng ở đâu). |
+| **Fix** | Xóa dòng dead-code index vào `int`; giữ `nunique()` + `kp3.metric("Số mã thôn có DN", ...)`. Không đổi số liệu hiển thị. |
+| **Test** | `venv\\Scripts\\python.exe -m py_compile tabs\\tab_quan_ly_dgd.py` (exit 0); grep toàn repo xác nhận không còn `ma_unique_ok`. |
+| **Ngày fix** | 2026-09-12 |
+
+---
+
+### J87 — "Phân công ĐGD phụ trách" crash: `'list' object has no attribute 'get'`
+| | |
+|---|---|
+| **File** | `tabs/tab_cbtd.py` → `_render_g1()` ~dòng 758; `data/khtd.py` |
+| **Dấu hiệu** | Vào 👔 CBTD & Địa bàn → Nhóm 1 (Trang chủ cá nhân) → chọn 1 CBTD có phân công ĐGD phụ trách → tab crash toàn bộ: `❌ Lỗi render **👔 CBTD & Địa bàn**: 'list' object has no attribute 'get'`. Traceback trỏ `_render_g1` dòng `info_d = (_ap_info or {}).get(_dgd, {})`. |
+| **Nguyên nhân** | Dòng `_ap_info = lay_ap_tu_dgd_list(pgd, _ds_dgd, dgd_map)` — hàm `lay_ap_tu_dgd_list()` (thiết kế cho join HSTD) trả về **`list[tuple(ten_xa, ten_ap)]`**, không phải dict. Dòng kế lại gọi `(_ap_info or {}).get(_dgd, {})` như nó là dict keyed theo tên ĐGD → `AttributeError: 'list' object has no attribute 'get'`. |
+| **Fix** | Thêm helper UI-dedicated mới `lay_thong_tin_dgd_theo_ten(pgd, ds_dgd, dgd_map) -> dict[dgd_name] → {"xa":..., "thon":[...]}` trong `data/khtd.py`. Preserve ĐGD từ `ds_dgd` ngay cả khi chưa có entry trong dgd_map (trả về placeholder `xa="" / thon=[]`) để bảng phân công không mất dòng. Hỗ trợ 2 schema entry: list cũ `[ap1, ap2]` và dict mới `{"thon":[...]}`. Filter None/pd.NA/rỗng/nan. Sửa call site `tabs/tab_cbtd.py` (phân công ĐGD) từ `lay_ap_tu_dgd_list` → `lay_thong_tin_dgd_theo_ten`. Hàm `_so_ap_cbtd()` và các join HSTD khác giữ nguyên `lay_ap_tu_dgd_list()` (không ảnh hưởng). |
+| **Test** | `venv\\Scripts\\python.exe -m py_compile data/khtd.py tabs/tab_cbtd.py` (ALL_OK). `venv\\Scripts\\python.exe -m pytest tests/test_smoke_imports.py -q -k "tab_cbtd or khtd"` → 14 passed. Quick sanity helper with mixed list/dict schema + missing entry → output dict placeholder đúng. |
+| **Ngày fix** | 2026-09-12 |
+
+---
+
+### J86 — Nhóm 3 CBTD gọi `cham_diem_cbtd_thang()` sai signature và đọc sai key điểm
+| | |
+|---|---|
+| **File** | `tabs/tab_cbtd.py` → `_render_g3()` ~dòng 1976 và 2016 |
+| **Dấu hiệu** | Vào `👔 CBTD & Địa bàn` → Nhóm 3 → chọn 1 CBTD hoặc xem BXH nhanh có thể hiện cảnh báo không chấm được điểm; log có `TypeError: cham_diem_cbtd_thang() got multiple values for argument 'ma_cb'`. Nếu không crash, điểm cũng có thể luôn 0 vì UI đọc key `tong_diem` trong khi service trả `diem_tong`. |
+| **Nguyên nhân** | UI mới copy nhầm thứ tự gọi helper theo kiểu cũ `cham_diem_cbtd_thang(cbtd_data, dgd_map, df, ma_cb=...)`; signature hiện tại là `cham_diem_cbtd_thang(ma_cb, yyyy, mm, *, cbtd_data, dgd_map, df_hstd, scope_pgd)`. |
+| **Fix** | Đổi cả 2 call-site Nhóm 3 sang signature hiện tại; đọc điểm bằng `diem_tong` và giữ fallback `tong_diem` để tương thích dữ liệu/hàm cũ. |
+| **Test** | `venv\\Scripts\\python.exe -m py_compile tabs\\tab_cbtd.py`; `venv\\Scripts\\python.exe -m pytest tests\\test_cbtd_dia_ban_review.py tests\\test_tab_cbtd_add_form.py -q` → 8 passed. |
+| **Ngày fix** | 2026-09-12 |
+
+---
+
+### J88 — `_kpi_tang_truong` so "tháng trước" nhưng dùng baseline 31/12 năm trước
+| | |
+|---|---|
+| **File** | `workspaces/ws_executive.py` → `_kpi_tang_truong()` ~dòng 221; `snapshot_service.py` |
+| **Dấu hiệu** | Dashboard Executive card "Tổng dư nợ / Dư nợ quá hạn" ghi delta "so tháng trước" nhưng giá trị chênh lệch rất lớn, đúng ra là so với 31/12 năm trước (baseline) chứ không phải biến động 1 tháng. |
+| **Nguyên nhân** | `_kpi_tang_truong()` gọi `ky_baseline()` (trả `YYYY-12` năm trước) trong khi label/help là "tháng trước". Bản sửa đầu tiên còn fallback sang kỳ cũ hơn và đổi ngày thực tế thành ngày cuối tháng. |
+| **Fix** | `ky_thang_truoc()` chỉ trả đúng tháng liền trước; giữ nguyên ngày dữ liệu nguồn và dùng `snapshot_la_cuoi_thang()` để chỉ tính delta khi mọi đơn vị có ngày đúng cuối tháng. Dashboard Executive và Mẫu 03 cùng áp dụng quy tắc này. |
+| **Test** | `tests/test_snapshot_service.py` và `tests/test_tab_mau03_khnv.py`; compile/smoke các module liên quan. |
+| **Ngày fix** | 2026-09-13 |
 
 ---
 

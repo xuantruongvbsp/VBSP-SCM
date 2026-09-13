@@ -26,6 +26,7 @@ from config import (
 import db
 from auth import normalize_role
 from data.dgd_helpers import (
+    entry_giu_nguyen_meta,
     khop_xa_dgd,
     pool_thon_cho_xa,
     trang_thai_pgd_vs_map,
@@ -214,7 +215,7 @@ def _render_gan_thon_pgd(
                     try:
                         m = copy.deepcopy(db.doc_dgd_map())
                         cur = m.setdefault(ten_pgd, {}).setdefault(chon_xa, {})
-                        cur[ten_dgd] = {"thon": list(thon_sel)}
+                        cur[ten_dgd] = entry_giu_nguyen_meta(list(thon_sel), cur.get(ten_dgd))
                         db.luu_dgd_map(m, username)
                         db.ghi_audit(
                             username, "cbtd_gan_thon_dgd",

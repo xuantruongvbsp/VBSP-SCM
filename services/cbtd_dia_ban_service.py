@@ -11,6 +11,7 @@ Cung cấp:
   - so_huu_cbtd_full()           : vector-optimised map (xa, thon) → (ma_cb, ten_cb, ten_xa_dgd)
   - lay_kpi_cbtd_theo_thang()    : [MỚI v4] KPI 1 CBTD theo tháng N (dùng cho Dashboard + Đèn GD)
   - tong_hop_hstd_theo_cbtd()    : [MỚI v4] bảng số liệu HSTD theo từng CBTD
+  - tong_hop_hstd_cbtd_xa_chuong_trinh(): bảng kiểu RPT CBTD-Xã-Chương trình
   - top_3_viec_uu_tien()         : [MỚI v4] Top 3 việc ưu tiên hôm nay (TN / NQH / Chờ duyệt GN)
   - cham_diem_cbtd_thang()       : [MỚI v4] Wrapper scorecard clamp 0-100 cho 1 CBTD 1 tháng
 """
@@ -25,16 +26,34 @@ import numpy as np
 from config import (
     COT_DU_NO_QH,
     COT_DU_NO_TH,
+    COT_DU_NO_KHOANH,
     COT_TONG_DU_NO,
     COT_TEN_THON,
     COT_TEN_XA,
+    COT_TEN_PGD,
+    COT_MA_THON,
+    COT_NGAY_SL,
     COT_TEN_CT,
     COT_MA_KH,
     COT_SO_KU,
     COT_NGAY_VAY,
     COT_NGAY_DEN_HAN,
+    COT_GOC_DEN_HAN_LK,
     COT_NGAY_GN_DAU_TIEN,
     COT_HINH_THUC_VAY,
+    COT_GIAI_NGAN_TRONG_THANG,
+    COT_GIAI_NGAN_NAM,
+    COT_GIAI_NGAN_TRONG_NAM,
+    COT_THU_NO_TH_THANG,
+    COT_THU_NO_QH_THANG,
+    COT_THU_NO_KHOANH_THANG,
+    COT_CHUYEN_QH_TRONG_THANG,
+    COT_THU_NO_TH_NAM,
+    COT_THU_NO_QH_NAM,
+    COT_THU_NO_KHOANH_NAM,
+    COT_CQH_NAM,
+    COT_LAI_TON,
+    COT_LAI_THANG,
 )
 
 try:
@@ -186,18 +205,18 @@ def _tim_dgd_cua_xa(pgd: str, xa: str, ds_dgd: list[str], dgd_map: dict) -> str:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Vector-optimised: (xa, thon) → (ma_cb, ten_cb)
+# Vector-optimised: (pgd, xa, thon) → (ma_cb, ten_cb)
 # ─────────────────────────────────────────────────────────────────────────────
 
 def so_huu_cbtd_full(cbtd_data: dict, dgd_map: dict) -> dict:
     """
     Xây lookup toàn diện phục vụ vector join với HSTD/Tổ.
     Trả về: {
-        "ap_map":      {(norm_xa, norm_thon): (ma_cb, ten_cb, pgd, dgd_name)},
+        "ap_map":      {(norm_pgd, norm_xa, norm_thon): (ma_cb, ten_cb, pgd, dgd_name)},
         "cb_meta":     {ma_cb: {ho_ten, pgd, so_dgd, so_ap, chuc_vu, ngay_bo_nhiem}},
     }
     """
-    ap_map: dict[tuple[str, str], tuple[str, str, str, str]] = {}
+    ap_map: dict[tuple[str, str, str], tuple[str, str, str, str]] = {}
     cb_meta: dict[str, dict] = {}
 
     for ma_cb, info in (cbtd_data or {}).items():
@@ -222,7 +241,7 @@ def so_huu_cbtd_full(cbtd_data: dict, dgd_map: dict) -> dict:
             xa_n = _normalize(ten_xa)
             ap_n = _normalize(ten_ap)
             dgd_name = _tim_dgd_cua_xa(pgd, ten_xa, ds_dgd, dgd_map)
-            key = (xa_n, ap_n)
+            key = (_normalize(pgd), xa_n, ap_n)
             if key not in ap_map:
                 ap_map[key] = (ma_cb, meta["ho_ten"], pgd, dgd_name)
 
@@ -733,9 +752,10 @@ def tong_hop_hstd_theo_cbtd(
     """
     columns = [
         "Ma_CBTD", "Ho_ten", "PGD", "So_DGD", "So_ap", "So_KH", "So_mon_vay",
-        "Tong_du_no", "Du_no_trong_han", "Du_no_qh", "TL_QH_pct", "So_CT",
-        "CT_du_no_lon_nhat", "Du_no_ct_lon_nhat", "So_KH_moi_thang",
-        "So_giai_ngan_thang", "Canh_bao",
+        "Tong_du_no", "Du_no_trong_han", "Du_no_qh", "TL_QH_pct",
+        "Cho_vay_thang", "Thu_no_thang", "Cho_vay_nam", "Thu_no_nam",
+        "No_den_han_mon", "No_den_han_goc", "So_mon_3m_khd", "So_mon_rui_ro",
+        "So_KH_moi_thang", "So_giai_ngan_thang", "Canh_bao",
     ]
     try:
         scoped: dict[str, dict] = {}
@@ -761,6 +781,23 @@ def tong_hop_hstd_theo_cbtd(
                 logger.error("tong_hop_hstd_theo_cbtd join HSTD: %s", e, exc_info=True)
                 df_joined = None
 
+        # Precompute cờ 3 tháng KHĐ + món rủi ro (chỉ 1 lần trên toàn df_joined)
+        df_mig_ku: set = set()
+        if df_joined is not None and not df_joined.empty:
+            try:
+                from data.hstd import danh_dau_khong_hd
+                df_joined = danh_dau_khong_hd(df_joined)
+            except Exception as e:
+                logger.error("tong_hop_hstd_theo_cbtd danh_dau_khong_hd: %s", e, exc_info=True)
+            if COT_LAI_TON in df_joined.columns and COT_LAI_THANG in df_joined.columns:
+                try:
+                    from data.hstd import canh_bao_migration
+                    _df_mig = canh_bao_migration(df_joined)
+                    if COT_SO_KU in _df_mig.columns:
+                        df_mig_ku = set(_df_mig[COT_SO_KU].dropna().astype(str).str.strip())
+                except Exception as e:
+                    logger.error("tong_hop_hstd_theo_cbtd canh_bao_migration: %s", e, exc_info=True)
+
         def _sum_col(df_part: pd.DataFrame, col: str) -> float:
             if col not in df_part.columns:
                 return 0.0
@@ -772,6 +809,12 @@ def tong_hop_hstd_theo_cbtd(
             s = df_part[col].dropna().astype("string").str.strip()
             s = s[(s != "") & ~s.str.lower().isin(["nan", "none", "<na>"])]
             return int(s.nunique() or 0)
+
+        def _sum_first(df_part: pd.DataFrame, cols: list[str]) -> float:
+            for col in cols:
+                if col in df_part.columns:
+                    return _sum_col(df_part, col)
+            return 0.0
 
         for ma_cb, info in scoped.items():
             pgd = info.get("pgd") or ""
@@ -786,17 +829,53 @@ def tong_hop_hstd_theo_cbtd(
             so_kh = _nunique_nonempty(df_cb, COT_MA_KH)
             so_mon = _nunique_nonempty(df_cb, COT_SO_KU)
             tl_qh = round(du_no_qh / tong_du_no * 100, 2) if tong_du_no > 0 else 0.0
-            so_ct = _nunique_nonempty(df_cb, COT_TEN_CT)
+            cho_vay_thang = _sum_col(df_cb, COT_GIAI_NGAN_TRONG_THANG)
+            thu_no_thang = (
+                _sum_col(df_cb, COT_THU_NO_TH_THANG)
+                + _sum_col(df_cb, COT_THU_NO_QH_THANG)
+                + _sum_col(df_cb, COT_THU_NO_KHOANH_THANG)
+            )
+            cho_vay_nam = _sum_first(df_cb, [COT_GIAI_NGAN_NAM, COT_GIAI_NGAN_TRONG_NAM])
+            thu_no_nam = (
+                _sum_col(df_cb, COT_THU_NO_TH_NAM)
+                + _sum_col(df_cb, COT_THU_NO_QH_NAM)
+                + _sum_col(df_cb, COT_THU_NO_KHOANH_NAM)
+            )
 
-            ct_lon_nhat = ""
-            du_no_ct_lon_nhat = 0.0
-            if COT_TEN_CT in df_cb.columns and COT_TONG_DU_NO in df_cb.columns and not df_cb.empty:
-                tmp_ct = df_cb[[COT_TEN_CT, COT_TONG_DU_NO]].copy()
-                tmp_ct[COT_TONG_DU_NO] = pd.to_numeric(tmp_ct[COT_TONG_DU_NO], errors="coerce").fillna(0)
-                by_ct = tmp_ct.groupby(COT_TEN_CT, dropna=True)[COT_TONG_DU_NO].sum().sort_values(ascending=False)
-                if not by_ct.empty:
-                    ct_lon_nhat = str(by_ct.index[0])
-                    du_no_ct_lon_nhat = float(by_ct.iloc[0] or 0.0)
+            # Nợ đến hạn trong tháng (số món + gốc đến hạn)
+            no_den_han_mon = 0
+            no_den_han_goc = 0.0
+            if yyyy and mm and not df_cb.empty and COT_NGAY_DEN_HAN in df_cb.columns:
+                ng_dh = _parse_dt_series(df_cb[COT_NGAY_DEN_HAN])
+                mask_dh = (ng_dh.dt.year.astype("Int64") == int(yyyy)) & (
+                    ng_dh.dt.month.astype("Int64") == int(mm)
+                )
+                _df_dh = df_cb.loc[mask_dh.fillna(False)]
+                no_den_han_mon = _nunique_nonempty(_df_dh, COT_SO_KU)
+                if COT_GOC_DEN_HAN_LK in _df_dh.columns:
+                    no_den_han_goc = _sum_col(_df_dh, COT_GOC_DEN_HAN_LK)
+                else:
+                    no_den_han_goc = _sum_col(_df_dh, COT_TONG_DU_NO)
+
+            # Món vay 3 tháng không hoạt động
+            so_mon_3m_khd = 0
+            if "is_3m_inactive" in df_cb.columns and COT_SO_KU in df_cb.columns and not df_cb.empty:
+                so_mon_3m_khd = int(
+                    df_cb.loc[df_cb["is_3m_inactive"].fillna(False).astype(bool), COT_SO_KU]
+                    .dropna().nunique() or 0
+                )
+
+            # Món vay rủi ro (quá hạn hoặc dấu hiệu chuyển NQH)
+            so_mon_rui_ro = 0
+            if COT_SO_KU in df_cb.columns and not df_cb.empty:
+                ku_ser = df_cb[COT_SO_KU].astype("string").str.strip()
+                if COT_DU_NO_QH in df_cb.columns:
+                    mask_qh = pd.to_numeric(df_cb[COT_DU_NO_QH], errors="coerce").fillna(0) > 0
+                else:
+                    mask_qh = pd.Series(False, index=df_cb.index)
+                mask_mig = ku_ser.isin(df_mig_ku)
+                valid_ku = ku_ser.notna() & (ku_ser != "") & ~ku_ser.str.lower().isin(["nan", "none", "<na>"])
+                so_mon_rui_ro = int(ku_ser[valid_ku & (mask_qh | mask_mig)].nunique() or 0)
 
             so_kh_moi = 0
             so_gn_thang = 0
@@ -838,9 +917,14 @@ def tong_hop_hstd_theo_cbtd(
                 "Du_no_trong_han": du_no_th,
                 "Du_no_qh": du_no_qh,
                 "TL_QH_pct": tl_qh,
-                "So_CT": so_ct,
-                "CT_du_no_lon_nhat": ct_lon_nhat,
-                "Du_no_ct_lon_nhat": du_no_ct_lon_nhat,
+                "Cho_vay_thang": cho_vay_thang,
+                "Thu_no_thang": thu_no_thang,
+                "Cho_vay_nam": cho_vay_nam,
+                "Thu_no_nam": thu_no_nam,
+                "No_den_han_mon": no_den_han_mon,
+                "No_den_han_goc": no_den_han_goc,
+                "So_mon_3m_khd": so_mon_3m_khd,
+                "So_mon_rui_ro": so_mon_rui_ro,
                 "So_KH_moi_thang": so_kh_moi,
                 "So_giai_ngan_thang": so_gn_thang,
                 "Canh_bao": "; ".join(canh_bao),
@@ -853,6 +937,352 @@ def tong_hop_hstd_theo_cbtd(
         ).reset_index(drop=True)
     except Exception as e:
         logger.error("tong_hop_hstd_theo_cbtd: %s", e, exc_info=True)
+        return pd.DataFrame(columns=columns)
+
+
+def tong_hop_hstd_theo_thon(
+    df_hstd: pd.DataFrame | None,
+    *,
+    yyyy: int | None = None,
+    mm: int | None = None,
+) -> pd.DataFrame:
+    """Tổng hợp chỉ tiêu HSTD theo xã/thôn (không gắn CBTD).
+
+    Dùng làm nguồn cho snapshot thôn — khi cần xem theo CBTD sẽ gán lại qua
+    mapping ĐGD/thôn (không đóng băng phân công CBTD). Các cột tiền giữ VND.
+    """
+    columns = [
+        "Ten_pgd", "Ma_thon", "Ten_xa", "Ten_thon", "Tong_du_no", "Du_no_th", "Du_no_qh",
+        "Cho_vay_thang", "Thu_no_thang", "Cho_vay_nam", "Thu_no_nam",
+        "No_den_han_mon", "No_den_han_goc",
+        "So_mon_3m_khd", "So_mon_rui_ro", "Ngay_so_lieu",
+    ]
+    if df_hstd is None or df_hstd.empty:
+        return pd.DataFrame(columns=columns)
+
+    df = df_hstd.copy()
+    if COT_HINH_THUC_VAY in df.columns:
+        htv = pd.to_numeric(df[COT_HINH_THUC_VAY], errors="coerce")
+        df = df[htv != 1]
+    if df.empty:
+        return pd.DataFrame(columns=columns)
+
+    if COT_TEN_XA not in df.columns:
+        df[COT_TEN_XA] = ""
+    if COT_TEN_THON not in df.columns:
+        df[COT_TEN_THON] = ""
+    if COT_TEN_PGD not in df.columns:
+        df[COT_TEN_PGD] = ""
+    if COT_MA_THON not in df.columns:
+        df[COT_MA_THON] = ""
+
+    for col in [COT_TEN_PGD, COT_MA_THON, COT_TEN_XA, COT_TEN_THON]:
+        df[col] = df[col].astype("string").fillna("").str.strip()
+    df[COT_MA_THON] = df[COT_MA_THON].str.replace(r"\.0+$", "", regex=True)
+
+    for col in [
+        COT_TONG_DU_NO, COT_DU_NO_TH, COT_DU_NO_QH, COT_GIAI_NGAN_TRONG_THANG,
+        COT_THU_NO_TH_THANG, COT_THU_NO_QH_THANG, COT_THU_NO_KHOANH_THANG,
+        COT_THU_NO_TH_NAM, COT_THU_NO_QH_NAM, COT_THU_NO_KHOANH_NAM,
+    ]:
+        if col not in df.columns:
+            df[col] = 0.0
+        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+
+    if COT_GIAI_NGAN_NAM in df.columns:
+        df["__cho_vay_nam__"] = pd.to_numeric(df[COT_GIAI_NGAN_NAM], errors="coerce").fillna(0)
+    elif COT_GIAI_NGAN_TRONG_NAM in df.columns:
+        df["__cho_vay_nam__"] = pd.to_numeric(df[COT_GIAI_NGAN_TRONG_NAM], errors="coerce").fillna(0)
+    else:
+        df["__cho_vay_nam__"] = 0.0
+
+    if COT_GOC_DEN_HAN_LK in df.columns:
+        df["__goc_den_han_nguon__"] = pd.to_numeric(
+            df[COT_GOC_DEN_HAN_LK], errors="coerce"
+        ).fillna(0)
+    else:
+        df["__goc_den_han_nguon__"] = df[COT_TONG_DU_NO]
+
+    if COT_NGAY_SL in df.columns:
+        df["__ngay_so_lieu__"] = _parse_dt_series(df[COT_NGAY_SL])
+    else:
+        df["__ngay_so_lieu__"] = pd.NaT
+
+    df["__thu_no_thang__"] = (
+        df[COT_THU_NO_TH_THANG] + df[COT_THU_NO_QH_THANG] + df[COT_THU_NO_KHOANH_THANG]
+    )
+
+    df["__thu_no_nam__"] = (
+        df[COT_THU_NO_TH_NAM] + df[COT_THU_NO_QH_NAM] + df[COT_THU_NO_KHOANH_NAM]
+    )
+
+    df["__thu_no_nam__"] = (
+        df[COT_THU_NO_TH_NAM] + df[COT_THU_NO_QH_NAM] + df[COT_THU_NO_KHOANH_NAM]
+    )
+
+    if COT_SO_KU not in df.columns:
+        df[COT_SO_KU] = range(len(df))
+    _ku_str = df[COT_SO_KU].astype(str)
+
+    # Cờ 3 tháng KHĐ
+    try:
+        from data.hstd import danh_dau_khong_hd
+        df = danh_dau_khong_hd(df)
+    except Exception as e:
+        logger.error("tong_hop_hstd_theo_thon danh_dau_khong_hd: %s", e, exc_info=True)
+    if "is_3m_inactive" not in df.columns:
+        df["is_3m_inactive"] = False
+
+    # Cờ rủi ro (quá hạn hoặc dấu hiệu chuyển NQH)
+    _is_rui_ro = df[COT_DU_NO_QH] > 0
+    if COT_LAI_TON in df.columns and COT_LAI_THANG in df.columns:
+        try:
+            from data.hstd import canh_bao_migration
+            _mig = canh_bao_migration(df)
+            if COT_SO_KU in _mig.columns and not _mig.empty:
+                _mig_ku = set(_mig[COT_SO_KU].dropna().astype(str).str.strip())
+                _is_rui_ro = _is_rui_ro | _ku_str.isin(_mig_ku)
+        except Exception as e:
+            logger.error("tong_hop_hstd_theo_thon canh_bao_migration: %s", e, exc_info=True)
+
+    # Cột khế ước/gốc đến hạn (chỉ cho món đến hạn trong tháng)
+    df["__ku_den_han__"] = None
+    df["__goc_den_han__"] = 0.0
+    if yyyy and mm and COT_NGAY_DEN_HAN in df.columns:
+        ng_dh = _parse_dt_series(df[COT_NGAY_DEN_HAN])
+        mask_dh = (
+            (ng_dh.dt.year.astype("Int64") == int(yyyy))
+            & (ng_dh.dt.month.astype("Int64") == int(mm))
+        ).fillna(False)
+        if bool(mask_dh.any()):
+            df.loc[mask_dh, "__ku_den_han__"] = _ku_str[mask_dh]
+            df.loc[mask_dh, "__goc_den_han__"] = df.loc[mask_dh, "__goc_den_han_nguon__"]
+
+    df["__ku_3m__"] = None
+    df["__ku_rui_ro__"] = None
+    _m3 = df["is_3m_inactive"].fillna(False).astype(bool)
+    df.loc[_m3, "__ku_3m__"] = _ku_str[_m3]
+    df.loc[_is_rui_ro, "__ku_rui_ro__"] = _ku_str[_is_rui_ro]
+
+    agg = df.groupby(
+        [COT_TEN_PGD, COT_MA_THON, COT_TEN_XA, COT_TEN_THON], dropna=False
+    ).agg(
+        Tong_du_no=(COT_TONG_DU_NO, "sum"),
+        Du_no_th=(COT_DU_NO_TH, "sum"),
+        Du_no_qh=(COT_DU_NO_QH, "sum"),
+        Cho_vay_thang=(COT_GIAI_NGAN_TRONG_THANG, "sum"),
+        Thu_no_thang=("__thu_no_thang__", "sum"),
+        Cho_vay_nam=("__cho_vay_nam__", "sum"),
+        Thu_no_nam=("__thu_no_nam__", "sum"),
+        No_den_han_mon=("__ku_den_han__", "nunique"),
+        No_den_han_goc=("__goc_den_han__", "sum"),
+        So_mon_3m_khd=("__ku_3m__", "nunique"),
+        So_mon_rui_ro=("__ku_rui_ro__", "nunique"),
+        Ngay_so_lieu=("__ngay_so_lieu__", "max"),
+    ).reset_index()
+
+    agg = agg.rename(columns={
+        COT_TEN_PGD: "Ten_pgd", COT_MA_THON: "Ma_thon",
+        COT_TEN_XA: "Ten_xa", COT_TEN_THON: "Ten_thon",
+    })
+    agg["Ngay_so_lieu"] = pd.to_datetime(agg["Ngay_so_lieu"], errors="coerce").dt.strftime("%d/%m/%Y")
+    for c in ["No_den_han_mon", "So_mon_3m_khd", "So_mon_rui_ro"]:
+        agg[c] = agg[c].fillna(0).astype(int)
+    return agg[columns].reset_index(drop=True)
+
+
+def tong_hop_thon_snapshot_theo_cbtd(
+    df_thon: pd.DataFrame,
+    cbtd_data: dict,
+    dgd_map: dict,
+) -> pd.DataFrame:
+    """Gán lại CBTD cho snapshot thôn (kỳ cũ) và gộp theo CBTD.
+
+    df_thon: DataFrame từ doc_thon_snapshot() (cột ten_xa, ten_thon, các chỉ tiêu).
+    Trả về DataFrame theo ma_cb với các chỉ tiêu đã gộp (sum).
+    """
+    if df_thon is None or df_thon.empty:
+        return pd.DataFrame()
+
+    df = df_thon.copy()
+    rename_to_hstd = {
+        "ten_pgd": COT_TEN_PGD,
+        "ma_thon": COT_MA_THON,
+        "ten_xa": COT_TEN_XA,
+        "ten_thon": COT_TEN_THON,
+    }
+    df = df.rename(columns={k: v for k, v in rename_to_hstd.items() if k in df.columns})
+
+    from data.khtd import gan_cbtd_vao_df
+
+    if COT_TEN_PGD in df.columns:
+        pgd_clean = df[COT_TEN_PGD].astype("string").fillna("").str.strip()
+        legacy_pgd = pgd_clean.eq("") | pgd_clean.str.upper().eq("__UNKNOWN__")
+        df_co_pgd = gan_cbtd_vao_df(df.loc[~legacy_pgd], cbtd_data, dgd_map)
+        df_cu = df.loc[legacy_pgd].drop(columns=[COT_TEN_PGD])
+        df_khong_pgd = gan_cbtd_vao_df(df_cu, cbtd_data, dgd_map) if not df_cu.empty else pd.DataFrame()
+        df = pd.concat([df_co_pgd, df_khong_pgd], ignore_index=True, sort=False)
+    else:
+        # Snapshot schema cũ: chỉ gán các xã/thôn hoặc mã thôn duy nhất toàn CN.
+        df = gan_cbtd_vao_df(df, cbtd_data, dgd_map)
+
+    df = df.rename(columns={"CBTD": "ma_cb"})
+    df = df[df["ma_cb"].notna()].copy()
+    if df.empty:
+        return pd.DataFrame()
+
+    metric_cols = [
+        "tong_du_no", "du_no_th", "du_no_qh", "cho_vay_thang", "thu_no_thang",
+        "cho_vay_nam", "thu_no_nam",
+        "no_den_han_mon", "no_den_han_goc", "so_mon_3m_khd", "so_mon_rui_ro",
+    ]
+    present = [c for c in metric_cols if c in df.columns]
+    for c in present:
+        df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
+
+    return df.groupby("ma_cb", dropna=False)[present].sum().reset_index()
+
+
+def tong_hop_hstd_cbtd_xa_chuong_trinh(
+    cbtd_data: dict,
+    dgd_map: dict,
+    df_hstd: pd.DataFrame | None,
+    *,
+    scope_pgd: str | None = None,
+    scope_ma_cb: str | None = None,
+) -> pd.DataFrame:
+    """Tổng hợp HSTD theo CBTD → xã → chương trình, mô phỏng bảng RPT CBTD.
+
+    Đơn vị các cột tiền trong kết quả: triệu đồng. Những chỉ tiêu phát sinh
+    như cho vay/thu nợ/tăng giảm chỉ được tính khi HSTD có cột tương ứng.
+    """
+    columns = [
+        "Mã CBTD", "Họ và tên", "PGD", "Tên xã quản lý", "Chương trình",
+        "KH vay vốn", "Món vay", "Tổng dư nợ (triệu)", "Trong hạn (triệu)",
+        "Quá hạn (triệu)", "Khoanh (triệu)", "Cho vay tháng (triệu)",
+        "Thu nợ tháng (triệu)", "DN tăng/giảm tháng (triệu)",
+        "DN tăng/giảm năm (triệu)", "QH tăng/giảm tháng (triệu)",
+        "QH tăng/giảm năm (triệu)", "Tỷ lệ QH %",
+    ]
+    try:
+        scoped: dict[str, dict] = {}
+        for ma_cb, info in (cbtd_data or {}).items():
+            if scope_ma_cb and ma_cb != scope_ma_cb:
+                continue
+            pgd_cb = (info or {}).get("pgd") or ""
+            if scope_pgd and pgd_cb.strip().lower() != scope_pgd.strip().lower():
+                continue
+            scoped[ma_cb] = info or {}
+
+        if df_hstd is None or df_hstd.empty or not scoped:
+            return pd.DataFrame(columns=columns)
+
+        from data.khtd import gan_cbtd_vao_df
+
+        df_joined = gan_cbtd_vao_df(df_hstd, scoped, dgd_map)
+        if "CBTD" not in df_joined.columns or COT_TONG_DU_NO not in df_joined.columns:
+            return pd.DataFrame(columns=columns)
+
+        if COT_HINH_THUC_VAY in df_joined.columns:
+            htv = pd.to_numeric(df_joined[COT_HINH_THUC_VAY], errors="coerce")
+            df_joined = df_joined[htv.fillna(2) != 1].copy()
+
+        df_joined = df_joined[df_joined["CBTD"].notna()].copy()
+        df_joined[COT_TONG_DU_NO] = pd.to_numeric(df_joined[COT_TONG_DU_NO], errors="coerce").fillna(0)
+        df_joined = df_joined[df_joined[COT_TONG_DU_NO] > 0].copy()
+        if scope_ma_cb:
+            df_joined = df_joined[df_joined["CBTD"] == scope_ma_cb].copy()
+        if df_joined.empty:
+            return pd.DataFrame(columns=columns)
+
+        if COT_TEN_XA not in df_joined.columns:
+            df_joined[COT_TEN_XA] = ""
+        if COT_TEN_CT not in df_joined.columns:
+            df_joined[COT_TEN_CT] = ""
+
+        numeric_cols = [
+            COT_DU_NO_TH, COT_DU_NO_QH, COT_DU_NO_KHOANH,
+            COT_GIAI_NGAN_TRONG_THANG, COT_GIAI_NGAN_NAM, COT_GIAI_NGAN_TRONG_NAM,
+            COT_THU_NO_TH_THANG, COT_THU_NO_QH_THANG, COT_THU_NO_KHOANH_THANG,
+            COT_CHUYEN_QH_TRONG_THANG, COT_THU_NO_TH_NAM, COT_THU_NO_QH_NAM,
+            COT_THU_NO_KHOANH_NAM, COT_CQH_NAM,
+        ]
+        for col in numeric_cols:
+            if col in df_joined.columns:
+                df_joined[col] = pd.to_numeric(df_joined[col], errors="coerce").fillna(0)
+
+        def _sum_col(df_part: pd.DataFrame, col: str) -> float:
+            if col not in df_part.columns:
+                return 0.0
+            return float(pd.to_numeric(df_part[col], errors="coerce").fillna(0).sum() or 0.0)
+
+        def _sum_first(df_part: pd.DataFrame, cols: list[str]) -> float:
+            for col in cols:
+                if col in df_part.columns:
+                    return _sum_col(df_part, col)
+            return 0.0
+
+        def _nunique_nonempty(df_part: pd.DataFrame, col: str) -> int:
+            if col not in df_part.columns:
+                return 0
+            s = df_part[col].dropna().astype("string").str.strip()
+            s = s[(s != "") & ~s.str.lower().isin(["nan", "none", "<na>"])]
+            return int(s.nunique() or 0)
+
+        rows: list[dict[str, Any]] = []
+        group_cols = ["CBTD", COT_TEN_XA, COT_TEN_CT]
+        for (ma_cb, ten_xa, ten_ct), g in df_joined.groupby(group_cols, dropna=False):
+            ma_cb_s = str(ma_cb or "").strip()
+            info = scoped.get(ma_cb_s) or {}
+            tong_dn = _sum_col(g, COT_TONG_DU_NO)
+            du_th = _sum_col(g, COT_DU_NO_TH)
+            du_qh = _sum_col(g, COT_DU_NO_QH)
+            du_khoanh = _sum_col(g, COT_DU_NO_KHOANH)
+            cho_vay_thang = _sum_col(g, COT_GIAI_NGAN_TRONG_THANG)
+            thu_no_thang = (
+                _sum_col(g, COT_THU_NO_TH_THANG)
+                + _sum_col(g, COT_THU_NO_QH_THANG)
+                + _sum_col(g, COT_THU_NO_KHOANH_THANG)
+            )
+            cho_vay_nam = _sum_first(g, [COT_GIAI_NGAN_NAM, COT_GIAI_NGAN_TRONG_NAM, "Cho vay trong năm"])
+            thu_no_nam = _sum_first(g, ["Thu nợ trong năm", "Doanh số thu nợ năm", "Thu nợ năm"])
+            if thu_no_nam == 0:
+                thu_no_nam = (
+                    _sum_col(g, COT_THU_NO_TH_NAM)
+                    + _sum_col(g, COT_THU_NO_QH_NAM)
+                    + _sum_col(g, COT_THU_NO_KHOANH_NAM)
+                )
+            qh_tang_giam_thang = _sum_col(g, COT_CHUYEN_QH_TRONG_THANG) - _sum_col(g, COT_THU_NO_QH_THANG)
+            qh_tang_giam_nam = _sum_col(g, COT_CQH_NAM) - _sum_col(g, COT_THU_NO_QH_NAM)
+            rows.append({
+                "Mã CBTD": ma_cb_s,
+                "Họ và tên": info.get("ho_ten", ""),
+                "PGD": info.get("pgd", ""),
+                "Tên xã quản lý": str(ten_xa or "").strip(),
+                "Chương trình": str(ten_ct or "").strip(),
+                "KH vay vốn": _nunique_nonempty(g, COT_MA_KH),
+                "Món vay": _nunique_nonempty(g, COT_SO_KU) or int(len(g)),
+                "Tổng dư nợ (triệu)": round(tong_dn / 1_000_000, 0),
+                "Trong hạn (triệu)": round(du_th / 1_000_000, 0),
+                "Quá hạn (triệu)": round(du_qh / 1_000_000, 0),
+                "Khoanh (triệu)": round(du_khoanh / 1_000_000, 0),
+                "Cho vay tháng (triệu)": round(cho_vay_thang / 1_000_000, 0),
+                "Thu nợ tháng (triệu)": round(thu_no_thang / 1_000_000, 0),
+                "DN tăng/giảm tháng (triệu)": round((cho_vay_thang - thu_no_thang) / 1_000_000, 0),
+                "DN tăng/giảm năm (triệu)": round((cho_vay_nam - thu_no_nam) / 1_000_000, 0),
+                "QH tăng/giảm tháng (triệu)": round(qh_tang_giam_thang / 1_000_000, 0),
+                "QH tăng/giảm năm (triệu)": round(qh_tang_giam_nam / 1_000_000, 0),
+                "Tỷ lệ QH %": round(du_qh / tong_dn * 100, 3) if tong_dn > 0 else 0.0,
+            })
+
+        if not rows:
+            return pd.DataFrame(columns=columns)
+        return pd.DataFrame(rows, columns=columns).sort_values(
+            ["Mã CBTD", "Tên xã quản lý", "Chương trình"],
+            ascending=[True, True, True],
+        ).reset_index(drop=True)
+    except Exception as e:
+        logger.error("tong_hop_hstd_cbtd_xa_chuong_trinh: %s", e, exc_info=True)
         return pd.DataFrame(columns=columns)
 
 

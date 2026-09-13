@@ -472,19 +472,6 @@ def render(tab: "DeltaGenerator | None" = None, **kwargs) -> None:
 
             cbtd_data = _loc_cbtd_data(cbtd_data_raw, loc_pgd, loc_cb)
 
-            # Lọc cảnh báo
-            with st.expander("⚙️ Tinh chỉnh cảnh báo"):
-                c1, c2, c3 = st.columns(3)
-                with c1:
-                    nguong_qh = st.slider("Ngưỡng QH (%)", 0.5, 10.0, 2.0, 0.5,
-                                          key=f"{_kp}nguong_qh")
-                with c2:
-                    nguong_dgd_qt = st.number_input("Ngưỡng ĐGD quá tải", 2, 10, 5,
-                                                    key=f"{_kp}nguong_dgd_qt")
-                with c3:
-                    nguong_ap_qt = st.number_input("Ngưỡng ấp quá tải", 5, 100, 30,
-                                                   key=f"{_kp}nguong_ap_qt")
-
         # ── KPI Row ─────────────────────────────────────────────────────────
         kpi = tom_tat_kpi(cbtd_data, dgd_map, df_cdto)
 
@@ -551,9 +538,6 @@ def render(tab: "DeltaGenerator | None" = None, **kwargs) -> None:
         # ── Cảnh báo thông minh ─────────────────────────────────────────────
         canh_baos = canh_bao_cbtd_dia_ban(
             cbtd_data, dgd_map, df_full, df_cdto, df_cdto_truoc,
-            nguong_qh_pct=nguong_qh,
-            nguong_dgd_quatai=nguong_dgd_qt,
-            nguong_ap_quatai=nguong_ap_qt,
         )
 
         # Bộ lọc loại cảnh báo

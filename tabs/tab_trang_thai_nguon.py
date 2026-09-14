@@ -119,9 +119,13 @@ def _pgd_slug_local(ten_pgd: str) -> str:
 def _pgd_file_path(ten_pgd: str, loai: str) -> Path:
     """Trả về đường dẫn file PGD theo loại (hstd/nq11/gqvl/cdtotkvv).
     Dùng duong_dan_pgd() từ data.pgd để đảm bảo path nhất quán với upload_service.
+    Với HSTD: ưu tiên file mới hơn giữa PGD upload (hstd_latest.xlsx)
+    và Phòng KH-NV upload (hstd_khnv.xlsx) — giống logic bảng trạng thái upload.
     """
     try:
-        from data.pgd import duong_dan_pgd
+        from data.pgd import duong_dan_pgd, duong_dan_hstd_hien_hanh
+        if loai == "hstd":
+            return Path(duong_dan_hstd_hien_hanh(ten_pgd))
         return Path(duong_dan_pgd(ten_pgd, loai))
     except Exception as e:  # conv: skip
         logger.error("Lỗi _pgd_file_path(%s, %s): %s", ten_pgd, loai, e)

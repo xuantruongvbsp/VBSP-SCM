@@ -12,6 +12,9 @@ from config import (
     COT_SO_KU, COT_MA_KH, COT_TONG_DU_NO, COT_DU_NO_QH,
     COT_PHAN_LOAI, COT_TEN_PGD, COT_TEN_CT, COT_NGAY_SL, CACHE_DIR,
 )
+from logger import get_logger
+
+logger = get_logger(__name__)
 
 _SNAPSHOT_DIR = Path(CACHE_DIR) / "snapshots_loan"
 _KY_COLS = [COT_SO_KU, COT_MA_KH, COT_TONG_DU_NO, COT_DU_NO_QH,
@@ -41,8 +44,10 @@ def luu_snapshot(df: pd.DataFrame, username: str) -> str:
     try:
         from snapshot_service import luu_snapshot as _ls
         _ls(df, username)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error(
+            "luu_snapshot: snapshot tổng hợp kỳ %s thất bại — %s", ky, e, exc_info=True
+        )
 
     return ky
 

@@ -88,6 +88,7 @@ def lay_ap_tu_dgd_list(pgd: str, ds_dgd: list, dgd_map: dict) -> list[tuple[str,
         List (ten_xa, ten_ap) — dùng để join với HSTD qua cột Tên xã + Tên thôn
     """
     result = []
+    seen = set()
     xa_block = (dgd_map or {}).get(pgd, {})
     for ten_xa, dgd_block in xa_block.items():
         if not isinstance(dgd_block, dict):
@@ -102,9 +103,16 @@ def lay_ap_tu_dgd_list(pgd: str, ds_dgd: list, dgd_map: dict) -> list[tuple[str,
                 else:
                     thon_items = []
                 for ap in thon_items:
-                    ap_s = "" if ap is None else str(ap).strip()
-                    if ap_s and ap_s.lower() not in {"nan", "none", "<na>"}:
-                        result.append((ten_xa, ap_s))
+                    # Gom khoảng trắng liên tiếp: dgd_map có thể lưu cùng một ấp
+                    # với 2 biến thể ("Khu phố  Tân Hạnh 1" / "Khu phố Tân Hạnh 1").
+                    ap_s = "" if ap is None else re.sub(r"\s+", " ", str(ap).strip())
+                    if not ap_s or ap_s.lower() in {"nan", "none", "<na>"}:
+                        continue
+                    key = (_normalize_cbtd_join_text(ten_xa), _normalize_cbtd_join_text(ap_s))
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    result.append((ten_xa, ap_s))
     return result
 
 
@@ -157,14 +165,18 @@ def _normalize_cbtd_join_text(value) -> str:
     except (TypeError, ValueError):
         pass
     try:
-        text = str(value).strip().lower()
+        text = re.sub(r"\s+", " ", str(value).strip()).lower()
     except Exception:
         return ""
     return "" if text in {"nan", "none", "<na>"} else text
 
 
 def _normalize_cbtd_join_series(values: pd.Series) -> pd.Series:
-    text = values.astype("string").fillna("").str.strip().str.lower()
+    text = (
+        values.astype("string").fillna("").str.strip()
+        .str.replace(r"\s+", " ", regex=True)
+        .str.lower()
+    )
     return text.mask(text.isin(("nan", "none", "<na>")), "")
 
 

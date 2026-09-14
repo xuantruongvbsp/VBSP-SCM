@@ -589,6 +589,34 @@ hr {{ border: none !important; border-top: 1px solid {c['border']} !important; m
     background: {c['surface']};
 }}
 
+/* ── 22b. BẢNG RỘNG NHIỀU CỘT (.cdp-fit) — ép vừa khung, không cắt cột ── */
+.cdp-fit {{
+    overflow-x: auto;          /* override .cdp-wrap overflow:hidden → không mất cột phải */
+    overflow-y: hidden;
+    scrollbar-width: thin;
+}}
+.cdp-fit-t {{
+    font-size: .72rem;
+    table-layout: auto;
+    width: 100%;
+}}
+.cdp-fit-t thead th {{
+    padding: 4px 3px;
+    font-size: .56rem;
+    letter-spacing: .1px;
+    line-height: 1.2;
+    white-space: normal;       /* cho header xuống dòng thay vì đẩy rộng cột */
+    word-break: break-word;
+}}
+.cdp-fit-t .cdp-row td {{ padding: 3px 4px; }}
+.cdp-fit-t td.cdp-txt {{
+    text-align: left;
+    white-space: normal;       /* Họ tên / PGD được wrap → tiết kiệm bề ngang */
+    word-break: break-word;
+    min-width: 74px;
+}}
+.cdp-fit-t td.cdp-stt {{ min-width: 0; width: 1%; padding-left: 6px; }}
+
 /* ── 23. CẢNH BÁO NQH — KPI CARDS + BẢNG ĐƠN VỊ ── */
 .nqh-grid {{
     display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));

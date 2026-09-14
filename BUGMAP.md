@@ -213,6 +213,36 @@
 
 ## B. Streamlit UI
 
+### B103 — Bảng "📊 Dư nợ theo CBTD quản lý địa bàn" bị cắt mất cột mép phải (17 cột)
+| | |
+|---|---|
+| **File** | `utils_theme.py` → `.cdp-wrap` ~dòng 531, thêm nhóm `.cdp-fit` ~dòng 592; `tabs/tab_cbtd.py` → `_td()` ~dòng 427, `_html_bang_du_no()` ~dòng 440, `_html_bang_no_quan_tam()` ~dòng 512 |
+| **Dấu hiệu** | 👔 CBTD & Địa bàn → 📊 Tổng quan theo CBTD → bảng "Dư nợ theo CBTD quản lý địa bàn (triệu đồng)" chỉ hiện tới khoảng cột "Thu nợ"; các cột phải (Δ dư nợ, Δ quá hạn, TL QH %) mất hẳn, **không có thanh cuộn ngang** để xem tiếp. |
+| **Nguyên nhân** | `.cdp-wrap { overflow: hidden }` (viết cho bảng Cân đối ít cột) cắt phần tràn thay vì cho cuộn. Bảng CBTD có 17 cột, `.cdp-row td` và `.cdp-table thead th` đều `white-space: nowrap` + padding `12px`, riêng header "So 31/12 năm trước" nowrap nên mỗi cột bị đẩy rộng → tổng bề ngang > `.block-container` `max-width:1400px` → phần dư bị clip. |
+| **Fix** | Thêm biến thể `.cdp-fit` (wrapper, `overflow-x:auto` đặt **sau** `.cdp-wrap` để thắng cùng specificity) + `.cdp-fit-t` (table `font-size:.72rem`, padding ô `3px 4px`, `thead th` `white-space:normal` `.56rem` cho header tự xuống dòng) + `td.cdp-txt` (Mã CBTD / Họ tên / PGD được wrap, `min-width:74px`) + `td.cdp-stt`. `_td()` nhận thêm `cls` để gắn class; 2 hàm build bảng CBTD chuyển sang `class="cdp-wrap cdp-fit"` / `class="cdp-table cdp-fit-t"`. Ô số vẫn `nowrap` nên không vỡ số. |
+| **Test** | `pytest tests/test_tab_cbtd_add_form.py -q` → 14 passed (`test_html_bang_du_no_du_17_cot_va_nan_delta_hien_thi_gach` vẫn đếm đủ 17 `<td`). Compile `tabs/tab_cbtd.py` + `utils_theme.py` OK. Bảng `.cdp-*` ở `tabs/tab_candoi.py` không đổi (không gắn class mới). |
+| **Ngày fix** | 2026-09-13 |
+
+### B101 — Dashboard CBTD cảnh báo Excel crash/hiển thị sai khi chi tiết có `pd.NA`
+| | |
+|---|---|
+| **File** | `tabs/tab_cbtd_dashboard.py` → `_bo_md()`, `_lay_don_vi_canh_bao()`, `_xlsx_chi_tiet_canh_bao()` |
+| **Dấu hiệu** | Xuất Excel chi tiết cảnh báo có thể crash với `boolean value of NA is ambiguous`, hoặc bảng tổng hợp/Excel hiện đơn vị giả như `nan`/`<NA>`; loại cảnh báo mới có ký tự cấm trong tên sheet có thể làm openpyxl lỗi. |
+| **Nguyên nhân** | Helper dùng `s or ""` với `pd.NA`, convert scalar thiếu dữ liệu bằng `str()` thẳng, và tên sheet chỉ cắt 31 ký tự nhưng chưa sanitize ký tự `[]:*?/\\` hoặc chống trùng. |
+| **Fix** | Thêm `_text_sach()` để chuẩn hóa `None`/`NaN`/`pd.NA`; `_bo_md()` và `_lay_don_vi_canh_bao()` dùng helper này; thêm `_ten_sheet_canh_bao()` sanitize/chống trùng; sheet chi tiết fallback PGD sạch khi cột `PGD` rỗng. |
+| **Test** | `tests/test_tab_cbtd_dashboard.py::test_bang_tong_hop_canh_bao_fallback_don_vi_va_bo_nan_gia`; `test_xlsx_chi_tiet_canh_bao_sheet_hop_le_va_noi_dung_sach` |
+| **Ngày fix** | 2026-09-13 |
+
+### B100 — Bảng dư nợ CBTD hiển thị sai delta thiếu kỳ và PDF cộng tổng hai lần
+| | |
+|---|---|
+| **File** | `tabs/tab_cbtd.py` → `_fmt_tr_dau()`, `_fmt_so_dau()`, `_chuan_bi_pdf_bang_du_no()`, phần xuất PDF Tổng quan CBTD |
+| **Dấu hiệu** | CBTD chưa có dòng ở snapshot kỳ so sánh có thể hiển thị delta `0` thay vì `—`; PDF cũng có thể ép delta thiếu kỳ thành `0`; PDF xuất hai dòng tổng và các cột tiền/số đếm ở dòng tổng cuối bị gấp đôi. |
+| **Nguyên nhân** | Khi DataFrame có cả số và `None`, pandas đổi `None` thành `NaN` nhưng formatter gộp `NaN` với giá trị gần 0. Phần chuẩn bị PDF dùng `fillna(0)` cho cả cột delta. DataFrame truyền vào PDF đã chứa dòng `TỔNG` trong khi `xuat_pdf_co_chart(..., them_dong_tong=True)` tiếp tục cộng toàn bộ bảng. |
+| **Fix** | Tách nhánh `NaN` trả `—`; giữ nhánh số gần 0 trả `0`. Tách `_chuan_bi_pdf_bang_du_no()` để quy tiền về triệu nhưng giữ `—` cho delta thiếu kỳ. Dùng dòng tổng gia quyền đã tạo sẵn và đặt `them_dong_tong=False` khi xuất PDF. |
+| **Test** | `tests/test_tab_cbtd_add_form.py::test_html_bang_du_no_du_17_cot_va_nan_delta_hien_thi_gach`; `test_chuan_bi_pdf_bang_du_no_giu_gach_cho_delta_thieu_ky`; `test_pdf_bang_du_no_khong_cong_them_dong_tong_lan_hai`; `test_tao_bang_tong_hop_sap_giam_va_tinh_delta_khong_lan_nan` |
+| **Ngày fix** | 2026-09-13 |
+
 ### B99 — Mẫu 03/KHNV chèn text động trực tiếp vào `st.html()`
 | | |
 |---|---|
@@ -1295,6 +1325,15 @@
 
 ## E. Upload / Merge
 
+### E25 — Trạng thái hệ thống báo thiếu HSTD dù KH-NV đã upload đủ 22 đơn vị
+| | |
+|---|---|
+| **File** | `tabs/tab_trang_thai_nguon.py` → `_pgd_file_path()`, `_render_tep_nguon()` |
+| **Dấu hiệu** | Bảng "🔍 Trạng thái hệ thống → Tệp nguồn → Upload riêng từng đơn vị (22 đơn vị)" chỉ báo vài đơn vị có HSTD, trong khi bảng "Upload dữ liệu" (KH-NV) cùng lúc báo đủ 22 đơn vị SL 31/8. |
+| **Nguyên nhân** | KH-NV upload HSTD lưu vào `hstd_khnv.xlsx` (riêng Phòng KH-NV), còn `hstd_latest.xlsx` là của PGD tự upload. `_pgd_file_path(dv, "hstd")` chỉ trả về `hstd_latest.xlsx` nên bỏ sót toàn bộ file KH-NV. |
+| **Fix** | Với `loai == "hstd"`, dùng `duong_dan_hstd_hien_hanh()` (chọn file mới hơn giữa `hstd_latest.xlsx` và `hstd_khnv.xlsx`) — đồng bộ với logic bảng trạng thái upload `lay_trang_thai_upload_pgd()`. |
+| **Ngày fix** | 2026-09-13 |
+
 ### E21 — Parser kỳ Điện báo nhận ngày không hợp lệ hoặc match lửng
 | | |
 |---|---|
@@ -2235,6 +2274,16 @@
 ---
 
 ## I. Phân quyền / Role
+
+### I10 — Tab vay trực tiếp CBTD lộ dữ liệu toàn Chi nhánh và không chặn quyền ghi
+| | |
+|---|---|
+| **File** | `tabs/tab_vay_noxh.py` — tab Vay trực tiếp NOXH (tách từ `tabs/tab_cbtd.py`) |
+| **Dấu hiệu** | Người dùng PGD có thể thấy danh sách vay trực tiếp lấy từ `df_full` toàn Chi nhánh; role không phải quản lý Chi nhánh vẫn có thể thấy nút giao/gỡ CBTD. Danh sách cũng lẫn chương trình khác và khoản đã tất toán. |
+| **Nguyên nhân** | Màn cũ lọc duy nhất `Hình thức vay = 1`, không giới hạn theo `pgd_user`/bộ lọc PGD và đặt thao tác ghi KV ngoài kiểm tra quyền. |
+| **Fix** | Chỉ lấy chương trình 12 còn dư nợ; giới hạn dữ liệu theo phạm vi PGD theo hướng fail-closed; buộc chọn một PGD và chỉ cho giao CBTD cùng PGD; chỉ `la_quan_ly_cn(role)` được giao, cập nhật và gỡ; bổ sung trạng thái/lịch theo dõi, cảnh báo quá hạn và audit ngay sau mỗi lần ghi KV. |
+| **Test** | `tests/test_tab_cbtd_add_form.py::test_loc_vay_truc_tiep_noxh_chi_lay_ct12_con_du_no`, `::test_gioi_han_noxh_theo_pgd_khong_lo_du_lieu_khi_thieu_cot_dia_ban`, `::test_quyen_quan_ly_noxh_chi_danh_cho_quan_ly_chi_nhanh`, `::test_tao_bang_theo_doi_noxh_ghep_phan_cong_va_canh_bao_qua_han` |
+| **Ngày fix** | 2026-09-13 |
 
 ### I9 — Module KH Công việc KH-NV hiển thị trong phân hệ PGD
 | | |
@@ -4699,6 +4748,52 @@ def _to_int(val, default=0):
 | **Nguyên nhân** | `_kpi_tang_truong()` gọi `ky_baseline()` (trả `YYYY-12` năm trước) trong khi label/help là "tháng trước". Bản sửa đầu tiên còn fallback sang kỳ cũ hơn và đổi ngày thực tế thành ngày cuối tháng. |
 | **Fix** | `ky_thang_truoc()` chỉ trả đúng tháng liền trước; giữ nguyên ngày dữ liệu nguồn và dùng `snapshot_la_cuoi_thang()` để chỉ tính delta khi mọi đơn vị có ngày đúng cuối tháng. Dashboard Executive và Mẫu 03 cùng áp dụng quy tắc này. |
 | **Test** | `tests/test_snapshot_service.py` và `tests/test_tab_mau03_khnv.py`; compile/smoke các module liên quan. |
+| **Ngày fix** | 2026-09-13 |
+
+---
+
+### J89 — Không so sánh được "tháng trước"/baseline vì thiếu snapshot thôn kỳ cũ + không có cách bơm lại
+| | |
+|---|---|
+| **File** | `tabs/tab_cbtd.py` → khối Tổng quan ~dòng 3782 & `_render_g3` ~dòng 3256; `services/upload_service.py`; `services/migration_service.py` → `luu_snapshot()` ~dòng 44 |
+| **Dấu hiệu** | Upload HSTD 31/08 nhưng bảng CBTD không so sánh được với 31/07 và 31/12; caption hiện kỳ `None`. Auto-snapshot chỉ tạo kỳ hiện tại, không có cách khôi phục kỳ cũ mà không upload lại kỳ mới nhất (upload kỳ cũ sẽ ghi đè `cache/hstd.parquet`). Lỗi snapshot tổng hợp bị `except Exception: pass` nuốt im lặng. |
+| **Nguyên nhân** | (1) Tổng quan CBTD đọc `thon_snapshot` (chỉ có kỳ hiện tại do auto-snapshot chạy từ migration 006), kỳ cũ chưa từng được bơm. (2) `merge_du_lieu_toan_cn()` luôn ghi đè cache → không thể nạp kỳ cũ độc lập. (3) Kỳ so sánh tính tay bằng chuỗi, thiếu kỳ thì ra `None`. (4) `migration_service.luu_snapshot` nuốt lỗi snapshot tổng hợp. |
+| **Fix** | Thêm `bom_snapshot_ky_cu()` (ghi snapshot kỳ cũ từ file từng đơn vị, KHÔNG đụng cache) + `chay_lai_snapshot_ky_hien_tai()` (đồng bộ, có progress). UI "🧭 Quản lý snapshot" thêm ma trận Kỳ × Loại, nút bơm kỳ cũ (upload/quét thư mục, tự nhận diện đơn vị) và nút chạy lại kỳ hiện tại. `tab_cbtd` chuyển sang `ky_thang_truoc()`/`ky_baseline()` trên `danh_sach_ky_thon()` và guard `None`. `migration_service` thay `pass` bằng `logger.error(..., exc_info=True)`. **Mở rộng:** thêm `bom_snapshot_cdtotkvv_ky_cu()` bơm `cdtotkvv_snapshot` + `cbtd_to_tkvv_snapshot` kỳ cũ (file toàn CN tự tách / file từng đơn vị) để bảng 🏅 Tổ TK&VV so sánh được kỳ cũ; UI bơm kỳ cũ thêm radio chọn loại HSTD/CDTOTKVV. |
+| **Test** | `tests/test_bom_snapshot_ky_cu.py` (17 test mới cho 3 hàm) + `pytest tests/test_snapshot_service.py tests/test_smoke_snapshot.py tests/test_tab_cbtd_dashboard.py tests/test_upload_service.py tests/test_so_sanh_ky_service.py tests/test_cdtotkvv_service.py tests/test_cdtotkvv_history.py -q` → 173 passed. |
+| **Ngày fix** | 2026-09-13 |
+
+---
+
+### C61 — Bảng "Tổng hợp dư nợ theo CBTD": TỔNG CỘNG trộn phạm vi, thiếu dòng chưa phân công, đếm trùng KH/món
+| | |
+|---|---|
+| **File** | `tabs/tab_cbtd.py` → `_render_g2()` khối "BÁO CÁO DƯ NỢ THEO CBTD" ~dòng 2873-2991 |
+| **Dấu hiệu** | Tổng dư nợ toàn CN trong parquet = **13.698,73 tỷ** nhưng bảng chỉ hiện TỔNG CỘNG **961,87 tỷ**, không cách nào đối chiếu được. Số KH cộng 5 CBTD = 10.866 trong khi `nunique` thật = 10.865 (dư 1); Số món 12.193 vs 12.189 (dư 4). |
+| **Nguyên nhân** | (1) **Trộn phạm vi:** 5 dòng CBTD chỉ thuộc các PGD đã cấu hình `dgd_map` (hiện chỉ Hội sở → 604,98 tỷ), nhưng dòng `VAY TRỰC TIẾP (HTV=1)` lại tính `_df_vt = df[_mask_vt]` trên **toàn CN 22 đơn vị** (847 dòng / 356,89 tỷ). Cộng 2 phạm vi khác nhau → TỔNG CỘNG vô nghĩa. (2) **Thiếu dòng "chưa phân công":** 12.736,86 tỷ / 357.550 dòng HTV≠1 không khớp CBTD nào bị bỏ hẳn, không xuất hiện ở dòng nào. (3) **Đếm trùng:** `nunique()` từng CBTD rồi `+=` vào `_t_so_kh`/`_t_so_mon` — một KH/món có khoản vay ở 2 ấp thuộc 2 CBTD bị đếm 2 lần. (4) Lọc HTV=1 dùng `df_joined[COT_HINH_THUC_VAY] != 1` so sánh thô, sẽ **không lọc gì** nếu file PGD upload lưu cột này dạng chuỗi `"1"`. |
+| **Fix** | Tách rõ 3 phạm vi trên cùng một `df_joined_all`: `_mask_htv1` (dùng `pd.to_numeric(...)==1`), `_mask_scope` (PGD ∈ tập PGD đã có CBTD gán ĐGD, so casefold). Sinh 3 tập: `_df_vt` (HTV=1 ∩ scope), `_df_chua_pc` (HTV≠1 ∩ scope ∩ `CBTD.isna()`), `_df_scope` (mọi dòng ∩ scope). Thêm helper `_agg_dong(d) -> (kh, mon, tdn, dqh)` dùng chung. Bảng nay có dòng mới **"CHƯA PHÂN CÔNG CBTD"**; **TỔNG CỘNG** tính `nunique`/`sum` một lần trên `_df_scope` (không cộng dồn), kèm cột PGD ghi rõ phạm vi + `st.caption` giải thích. Nút "Xuất báo cáo CBTD" thêm 2 sheet `Vay truc tiep HTV1` và `Chua phan cong CBTD`. Kết quả: `604,98 + 181,93 + 72,44 = 859,35 tỷ` = **đúng bằng** tổng dư nợ Hội sở trong parquet (15.655 dòng, khớp tuyệt đối). |
+| **Test** | `venv\Scripts\python.exe -m py_compile tabs/tab_cbtd.py data/khtd.py` → COMPILE OK. Script đối chiếu read-only replicate đúng logic mới → TỔNG CỘNG 859,35 tỷ == Hội sở parquet 859,35 tỷ, 15.655 == 15.655 dòng ✅. `pytest tests/ -q -k "khtd or cbtd or smoke"` → **258 passed**. |
+| **Ngày fix** | 2026-09-13 |
+
+---
+
+### J90 — `dgd_map` lưu 2 biến thể khoảng trắng cho cùng một ấp → "Số ấp" đếm dư, join fallback theo tên thôn trượt
+| | |
+|---|---|
+| **File** | `data/khtd.py` → `_normalize_cbtd_join_text()` ~dòng 150, `_normalize_cbtd_join_series()` ~dòng 166, `lay_ap_tu_dgd_list()` ~dòng 80 |
+| **Dấu hiệu** | Cột "Số ấp" ở bảng CBTD tổng = **67** nhưng thực tế chỉ **66** ấp. `xay_ap_to_cbtd_map()` sinh 2 key cho cùng 1 ấp: `('hội sở chi nhánh tỉnh','biên hòa','khu phố  tân hạnh 1')` (2 khoảng trắng) và `(...,'khu phố tân hạnh 1')` (1 khoảng trắng). HSTD kỳ mới ghi tên thôn `"Khu phố  Tân Hạnh 1"` (2 khoảng trắng) nên nhánh fallback theo (PGD + Tên xã + Tên thôn) trượt — chỉ sống sót nhờ nhánh join chính theo **Mã thôn**. |
+| **Nguyên nhân** | Cả 2 hàm normalize chỉ `.strip().lower()` — **không gom khoảng trắng liên tiếp** ở giữa chuỗi. `lay_ap_tu_dgd_list()` cũng chỉ `.strip()` và **không khử trùng**, nên 2 biến thể trong `dgd_map` đi qua thành 2 phần tử list. |
+| **Fix** | Thêm `re.sub(r"\s+", " ", ...)` vào `_normalize_cbtd_join_text()` và `.str.replace(r"\s+", " ", regex=True)` vào `_normalize_cbtd_join_series()` (giữ nguyên thứ tự strip → collapse → lower). `lay_ap_tu_dgd_list()` gom khoảng trắng tên ấp + khử trùng theo `set` key `(xa_lower, ap_lower)`, giữ thứ tự xuất hiện đầu tiên. `lay_ma_thon_tu_dgd_list()` đã có khử trùng sẵn nên không đổi. |
+| **Test** | `xay_ap_to_cbtd_map()` trả **66** key (trước: 67); tổng "Số ấp" theo 5 CBTD = **66** (16+11+9+12+18). `pytest tests/ -q -k "khtd or cbtd or smoke"` → **258 passed**, không regress. Dư nợ không đổi (604,98 tỷ) vì join chính theo Mã thôn vẫn thắng. |
+| **Ngày fix** | 2026-09-13 |
+
+### B102 — Mã CBTD bị ép tiền tố `CB`; `_pgd_slug_ma()` xoá hết chữ có dấu gây trùng key widget
+| | |
+|---|---|
+| **File** | `tabs/tab_cbtd.py` → `_MA_CB_REGEX` ~dòng 670, `_validate_ma_cb()` ~dòng 687, `_pgd_slug_ma()` ~dòng 720, form Thêm mới ~dòng 1974, form Đổi mã ~dòng 2430 |
+| **Dấu hiệu** | Không thể đặt mã CBTD theo mã nhân sự thực tế của ngân hàng (`01`, `0112345678`, `NGUYỄN_VĂN_A`) — báo lỗi *"Mã CBTD phải bắt đầu bằng 'CB' theo sau là chữ/số/ _ /-"*. Nếu chỉ nới regex mà không sửa `_pgd_slug_ma()`: mọi mã thuần tiếng Việt (`NGUYỄN VĂN A`, `TRẦN THỊ B`, `BÌNH`) đều slug về `"CN"` → `edit_kp` trùng nhau → `DuplicateElementKey` khi mở form "✏️ Chỉnh sửa". |
+| **Nguyên nhân** | (1) `_MA_CB_REGEX = ^CB[A-Z0-9_-]{2,}$` hard-code tiền tố nghiệp vụ vào validate. (2) `_pgd_slug_ma()` dùng `re.sub(r"[^A-Z0-9]+", "_", ...)` — lớp ký tự ASCII-only nên chữ có dấu bị coi là "không hợp lệ" và bị thay bằng `_`, sau đó `strip("_")` làm rỗng chuỗi. |
+| **Fix** | (1) Đổi regex thành `^[^\s/\\:*?"<>|]{2,30}$` — nhập tự do, chỉ chặn khoảng trắng + ký tự không an toàn cho tên file (mã CBTD được đưa vào `file_name=f"CBTD_{chon}_..._HoSoNangLuc.pdf"` dòng ~1869). Cập nhật message lỗi, `help`/`placeholder` của 2 form. Giữ nguyên `.strip().upper()` ở call site để dedup key nhất quán, giữ `_auto_gen_ma_cb()` làm mặc định khi để trống. (2) `_pgd_slug_ma()` đổi sang `re.sub(r"\W+", "_", ...)` (Unicode-aware) → `"NGUYỄN VĂN A"` → `"NGUYỄN_VĂN_A"`, hết trùng. |
+| **Test** | `_validate_ma_cb`: `01`, `NGUYEN_VAN_A`, `CB_BIEN_HOA_001`, `BÌNH`, `A-B_01`, `0112345678`, `"  02  "` → **ok**; `CO DAU`, `A/B`, `A`, 31 ký tự, `A<B>C`, `D:E*F?G`, `""` → **reject** đúng message. Check trùng: `01` vs `{"01":...}` → reject; `bo_qua_ma` vẫn hoạt động. `_pgd_slug_ma`: `NGUYỄN VĂN A`→`NGUYỄN_VĂN_A`, `TRẦN THỊ B`→`TRẦN_THỊ_B`, `Hội sở Chi nhánh tỉnh`→`HỘI_SỞ_CHI_NHÁNH_TỈNH`, `01`→`01` (đều độc nhất). Compile ✅. |
 | **Ngày fix** | 2026-09-13 |
 
 ---

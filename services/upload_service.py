@@ -1576,6 +1576,387 @@ def merge_baseline_toan_cn(loai: str, nam: int) -> KetQuaUpload:
     )
 
 
+# ── Bơm snapshot kỳ cũ (không đụng cache hiện tại) ────────────────────────────
+
+def bom_snapshot_ky_cu(
+    ky: str,
+    files_theo_don_vi: dict,
+    username: str = "system",
+    loai: str = "hstd",
+) -> KetQuaUpload:
+    """Bơm snapshot cho một KỲ CŨ từ file HSTD của từng đơn vị.
+
+    Khác ``merge_du_lieu_toan_cn()``: KHÔNG ghi đè ``cache/hstd.parquet`` và KHÔNG
+    đổi kỳ dữ liệu hiện hành của app — chỉ ghi snapshot (HSTD / thôn / ủy thác)
+    theo ``ky`` chỉ định. Dùng để khôi phục mốc so sánh "tháng trước" hoặc
+    "31/12 năm trước" mà không phải upload lại kỳ mới nhất.
+
+    Tham số:
+      ky: "YYYY-MM" — ngày số liệu trong file phải đúng ngày cuối kỳ này.
+      files_theo_don_vi: {tên đơn vị: bytes file Excel hoặc đường dẫn file trên đĩa}
+    """
+    from data.pgd import pgd_slug
+    from snapshot_service import (
+        doc_thon_snapshot,
+        luu_snapshot as _luu_snap,
+        luu_thon_snapshot as _luu_thon_snap,
+        luu_uy_thac_snapshot as _luu_uy_thac_snap,
+        ngay_cuoi_thang,
+        snapshot_la_cuoi_thang,
+    )
+
+    ky_str = str(ky or "").strip()
+    if ngay_cuoi_thang(ky_str) is None:
+        return KetQuaUpload(False, f"❌ Kỳ không hợp lệ: {ky_str!r} — đúng dạng YYYY-MM.")
+    if not files_theo_don_vi:
+        return KetQuaUpload(False, "❌ Chưa có file nào để bơm snapshot.")
+    if loai != "hstd":
+        return KetQuaUpload(False, f"❌ Bơm snapshot kỳ cũ chỉ hỗ trợ HSTD (nhận: {loai!r}).")
+
+    tmp_dir = Path(CACHE_DIR) / "tmp_bom_ky_cu"
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    ds_file_tam: list[Path] = []
+    frames: list[pd.DataFrame] = []
+    da_doc: list[str] = []
+    loi: list[str] = []
+
+    try:
+        for ten_don_vi, nguon in files_theo_don_vi.items():
+            path_tmp = tmp_dir / f"{pgd_slug(ten_don_vi) or 'dv'}_{ky_str}.xlsx"
+            try:
+                if isinstance(nguon, (bytes, bytearray)):
+                    with open(path_tmp, "wb") as fh:
+                        fh.write(bytes(nguon))
+                else:
+                    shutil.copyfile(str(nguon), path_tmp)
+                ds_file_tam.append(path_tmp)
+
+                df_one = _doc_excel_pgd_thanh_df(str(path_tmp), loai)
+                if df_one is None or df_one.empty:
+                    loi.append(f"{ten_don_vi}: file rỗng hoặc không đọc được")
+                    continue
+                df_one = df_one.copy()
+                df_one[COT_TEN_PGD] = ten_don_vi
+                frames.append(df_one)
+                da_doc.append(ten_don_vi)
+            except Exception as e:
+                logger.error(
+                    "bom_snapshot_ky_cu: đọc file %s kỳ %s — %s", ten_don_vi, ky_str, e,
+                    exc_info=True,
+                )
+                loi.append(f"{ten_don_vi}: {e}")
+
+        if not frames:
+            return KetQuaUpload(
+                False,
+                "❌ Không đọc được file nào" + (f": {'; '.join(loi[:5])}" if loi else "."),
+            )
+
+        df_all = pd.concat(frames, ignore_index=True)
+        df_all = _normalize_merge_dataframe_for_parquet(df_all)
+
+        kq_snap = {
+            "HSTD": _luu_snap(df_all, username, ky=ky_str),
+            "Thôn": _luu_thon_snap(df_all, username, ky=ky_str),
+            "Ủy thác": _luu_uy_thac_snap(df_all, username, ky=ky_str),
+        }
+        for _ten, _kq in kq_snap.items():
+            if not _kq.thanh_cong:
+                logger.warning("bom_snapshot_ky_cu %s: %s — %s", ky_str, _ten, _kq.thong_bao)
+
+        la_cuoi_thang = bool(snapshot_la_cuoi_thang(doc_thon_snapshot(ky_str), ky_str))
+        db.ghi_audit(
+            username,
+            "bom_snapshot_ky_cu",
+            f"Kỳ {ky_str} — {len(da_doc)}/{len(files_theo_don_vi)} đơn vị, "
+            f"{fmt_so(len(df_all))} dòng"
+            + (f" | {len(loi)} lỗi" if loi else "")
+            + ("" if la_cuoi_thang else " | KHÔNG phải ngày cuối kỳ"),
+        )
+
+        msg = (
+            f"✅ Đã bơm snapshot kỳ **{ky_str}**: {len(da_doc)}/{len(files_theo_don_vi)} đơn vị · "
+            f"{fmt_so(len(df_all))} dòng · "
+            + " · ".join(f"{t} {'✅' if k.thanh_cong else '❌'}" for t, k in kq_snap.items())
+        )
+        if loi:
+            msg += f"\n\n⚠️ {len(loi)} đơn vị lỗi: " + "; ".join(loi[:5])
+        if not la_cuoi_thang:
+            msg += (
+                f"\n\n⚠️ Ngày số liệu trong file không phải **{ngay_cuoi_thang(ky_str)}** — "
+                "snapshot vẫn được lưu nhưng bảng so sánh theo CBTD sẽ bỏ qua kỳ này "
+                "(điều kiện dữ liệu cuối tháng)."
+            )
+        return KetQuaUpload(
+            bool(kq_snap["HSTD"].thanh_cong and kq_snap["Thôn"].thanh_cong),
+            msg,
+        )
+    except Exception as e:
+        logger.error("bom_snapshot_ky_cu: kỳ %s — %s", ky_str, e, exc_info=True)
+        db.ghi_audit(username, "bom_snapshot_ky_cu_loi", f"Kỳ {ky_str}: {e}")
+        return KetQuaUpload(False, f"❌ Lỗi bơm snapshot kỳ {ky_str}: {e}")
+    finally:
+        for _p in ds_file_tam:
+            for _candidate in (_p, _p.with_suffix(".parquet")):
+                try:
+                    if _candidate.exists():
+                        _candidate.unlink()
+                except OSError as e:
+                    logger.warning(
+                        "bom_snapshot_ky_cu: không xóa được file tạm %s — %s", _candidate, e
+                    )
+
+
+# ── Chạy lại snapshot kỳ hiện tại (đồng bộ, từ cache đã merge) ─────────────────
+
+def chay_lai_snapshot_ky_hien_tai(
+    username: str = "system",
+    progress_cb=None,
+) -> KetQuaUpload:
+    """Chạy lại TOÀN BỘ snapshot cho kỳ hiện tại từ ``cache/hstd.parquet``.
+
+    Khác auto-snapshot (background thread sau merge): hàm này chạy ĐỒNG BỘ để UI
+    hiển thị progress và báo lỗi ngay. Kỳ được suy ra tự động từ ngày số liệu
+    trong cache (``_ky_tu_df``). Không ghi đè cache, chỉ ghi lại các bảng snapshot.
+
+    progress_cb: callable tùy chọn ``(float 0..1, str mô tả)`` để cập nhật tiến độ.
+    """
+    from snapshot_service import (
+        _ky_tu_df as _ky_hstd,
+        luu_snapshot as _luu_snap,
+        luu_thon_snapshot as _luu_thon_snap,
+        luu_uy_thac_snapshot as _luu_uy_thac_snap,
+    )
+
+    def _bao(pct: float, msg: str) -> None:
+        if progress_cb is not None:
+            try:
+                progress_cb(pct, msg)
+            except Exception:  # pragma: no cover - progress_cb là tùy chọn
+                pass
+
+    cache_path = Path(CACHE_HSTD)
+    if not cache_path.exists():
+        return KetQuaUpload(False, "❌ Chưa có cache HSTD toàn CN — hãy upload/merge trước.")
+
+    try:
+        _bao(0.05, "Đang đọc cache HSTD toàn CN…")
+        df = pd.read_parquet(cache_path, engine="pyarrow")
+        if df is None or df.empty:
+            return KetQuaUpload(False, "❌ Cache HSTD rỗng — không có dữ liệu để snapshot.")
+        ky_str = _ky_hstd(df)
+    except Exception as e:
+        logger.error("chay_lai_snapshot_ky_hien_tai: đọc cache — %s", e, exc_info=True)
+        return KetQuaUpload(False, f"❌ Không đọc được cache HSTD: {e}")
+
+    ket_qua: dict[str, KetQuaUpload] = {}
+    try:
+        _bao(0.25, f"Snapshot HSTD kỳ {ky_str}…")
+        ket_qua["HSTD"] = _luu_snap(df, username, ky=ky_str)
+        _bao(0.45, "Snapshot Thôn…")
+        ket_qua["Thôn"] = _luu_thon_snap(df, username, ky=ky_str)
+        _bao(0.60, "Snapshot Ủy thác…")
+        ket_qua["Ủy thác"] = _luu_uy_thac_snap(df, username, ky=ky_str)
+    except Exception as e:
+        logger.error("chay_lai_snapshot_ky_hien_tai: kỳ %s — %s", ky_str, e, exc_info=True)
+        db.ghi_audit(username, "chay_lai_snapshot_loi", f"Kỳ {ky_str}: {e}")
+        return KetQuaUpload(False, f"❌ Lỗi chạy lại snapshot kỳ {ky_str}: {e}")
+
+    # CDTOTKVV + CBTD–Tổ (không phụ thuộc df HSTD)
+    try:
+        _bao(0.75, "Snapshot CDTOTKVV / CBTD–Tổ…")
+        from data.cdtotkvv import doc_cdtotkvv_toan_cn_pgd as _doc_cdtot
+        from snapshot_service import luu_cdtotkvv_snapshot as _luu_cdtot
+        df_cdtot = _doc_cdtot()
+        if df_cdtot is not None and not df_cdtot.empty:
+            ket_qua["CDTOTKVV"] = _luu_cdtot(df_cdtot, ky_str, username)
+            try:
+                from data.khtd import doc_cbtd as _doc_cbtd
+                from snapshot_service import luu_cbtd_to_tkvv_snapshot as _luu_cbtd_tot
+                cbtd = _doc_cbtd()
+                if cbtd:
+                    ket_qua["CBTD–Tổ"] = _luu_cbtd_tot(
+                        df_cdtot, cbtd, db.doc_dgd_map(), ky_str, username
+                    )
+            except Exception as e:
+                logger.error("chay_lai_snapshot: CBTD–Tổ kỳ %s — %s", ky_str, e, exc_info=True)
+    except Exception as e:
+        logger.error("chay_lai_snapshot: CDTOTKVV kỳ %s — %s", ky_str, e, exc_info=True)
+
+    _bao(0.95, "Hoàn tất…")
+    that_bai = [t for t, k in ket_qua.items() if not k.thanh_cong]
+    db.ghi_audit(
+        username,
+        "chay_lai_snapshot_ky_hien_tai",
+        f"Kỳ {ky_str} — {len(ket_qua) - len(that_bai)}/{len(ket_qua)} loại OK"
+        + (f" | lỗi: {', '.join(that_bai)}" if that_bai else ""),
+    )
+    try:
+        st.cache_data.clear()
+    except Exception as e:
+        logger.error("chay_lai_snapshot: không clear được cache — %s", e, exc_info=True)
+
+    msg = f"✅ Đã chạy lại snapshot kỳ **{ky_str}**: " + " · ".join(
+        f"{t} {'✅' if k.thanh_cong else '❌'}" for t, k in ket_qua.items()
+    )
+    return KetQuaUpload(not that_bai, msg)
+
+
+# ── Bơm snapshot Tổ TK&VV (CDTOTKVV) kỳ cũ ────────────────────────────────────
+
+def bom_snapshot_cdtotkvv_ky_cu(
+    ky: str,
+    files: "dict[str, bytes] | list[bytes]",
+    username: str = "system",
+) -> KetQuaUpload:
+    """Bơm snapshot CDTOTKVV + CBTD–Tổ cho một KỲ CŨ từ file chấm điểm Tổ TK&VV.
+
+    Bổ sung cho ``bom_snapshot_ky_cu`` (chỉ lo HSTD): khôi phục mốc so sánh
+    "số Tổ Tốt" của bảng 🏅 Chất lượng Tổ TK&VV mà không phải upload lại kỳ mới.
+    KHÔNG ghi đè ``cache/hstd.parquet`` hay ``pgd_data`` — chỉ ghi 2 bảng snapshot
+    ``cdtotkvv_snapshot`` và ``cbtd_to_tkvv_snapshot`` theo ``ky`` chỉ định.
+
+    Tham số:
+      ky: "YYYY-MM".
+      files: file CDTOTKVV — có thể là 1 file TOÀN CN (tự tách 22 đơn vị) hoặc
+             nhiều file từng đơn vị. Dạng ``{tên_file: bytes}`` hoặc ``[bytes]``.
+      Đơn vị được lấy từ NỘI DUNG file (ma_dv/ten_dv), không cần nhận diện bên ngoài.
+    """
+    from data.core import ts_file
+    from data.cdtotkvv import tach_file_cdto_toan_cn, doc_cdtotkvv_path
+    from data.khtd import doc_cbtd
+    from data.pgd import pgd_slug
+    from snapshot_service import (
+        ngay_cuoi_thang,
+        luu_cdtotkvv_snapshot as _luu_cdtot,
+        luu_cbtd_to_tkvv_snapshot as _luu_cbtd_tot,
+    )
+
+    ky_str = str(ky or "").strip()
+    if ngay_cuoi_thang(ky_str) is None:
+        return KetQuaUpload(False, f"❌ Kỳ không hợp lệ: {ky_str!r} — đúng dạng YYYY-MM.")
+
+    # Chuẩn hóa files về dạng list[bytes]
+    if isinstance(files, dict):
+        ds_bytes = list(files.values())
+    else:
+        ds_bytes = list(files or [])
+    ds_bytes = [b for b in ds_bytes if b]
+    if not ds_bytes:
+        return KetQuaUpload(False, "❌ Chưa có file CDTOTKVV nào để bơm snapshot.")
+
+    tmp_dir = Path(CACHE_DIR) / "tmp_bom_cdto_ky_cu"
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    ds_file_tam: list[Path] = []
+    frames: list[pd.DataFrame] = []
+    loi: list[str] = []
+
+    def _doc_tu_bytes(data: bytes, ten_goi: str) -> None:
+        """Đọc 1 file CDTOTKVV (per-unit, 20 cột) → append vào frames."""
+        tmp = tmp_dir / f"cdto_{pgd_slug(ten_goi) or 'dv'}_{ky_str}.xlsx"
+        try:
+            tmp.write_bytes(data)
+            ds_file_tam.append(tmp)
+            df_p = doc_cdtotkvv_path(str(tmp), ts_file(str(tmp)))
+            if df_p is not None and not df_p.empty:
+                frames.append(df_p)
+            else:
+                loi.append(f"{ten_goi}: file rỗng hoặc không đọc được")
+        except Exception as e:
+            logger.error(
+                "bom_snapshot_cdtotkvv_ky_cu: đọc %s kỳ %s — %s", ten_goi, ky_str, e,
+                exc_info=True,
+            )
+            loi.append(f"{ten_goi}: {e}")
+
+    try:
+        for idx, data in enumerate(ds_bytes):
+            ten_goi = f"file_{idx + 1}"
+            # Ưu tiên: thử tách file TOÀN CN → nhiều file con per-unit
+            pgd_map = None
+            try:
+                pgd_map = tach_file_cdto_toan_cn(data)
+            except Exception as e:
+                logger.info(
+                    "bom_snapshot_cdtotkvv_ky_cu: %s không phải file toàn CN (%s) — thử đọc per-unit.",
+                    ten_goi, e,
+                )
+            if pgd_map:
+                for ten_pgd, sub_bytes in pgd_map.items():
+                    _doc_tu_bytes(sub_bytes, ten_pgd)
+            else:
+                # Fallback: file từng đơn vị (20 cột) đọc trực tiếp
+                _doc_tu_bytes(data, ten_goi)
+
+        if not frames:
+            return KetQuaUpload(
+                False,
+                "❌ Không đọc được dữ liệu CDTOTKVV nào"
+                + (f": {'; '.join(loi[:5])}" if loi else "."),
+            )
+
+        df_cdto = pd.concat(frames, ignore_index=True)
+
+        cbtd_data = doc_cbtd() or {}
+        dgd_map = db.doc_dgd_map() or {}
+
+        ket_qua: dict[str, KetQuaUpload] = {
+            "CDTOTKVV": _luu_cdtot(df_cdto, ky_str, username),
+        }
+        if cbtd_data:
+            ket_qua["CBTD–Tổ"] = _luu_cbtd_tot(
+                df_cdto, cbtd_data, dgd_map, ky_str, username
+            )
+        else:
+            logger.warning(
+                "bom_snapshot_cdtotkvv_ky_cu: chưa có CBTD — bỏ qua snapshot CBTD–Tổ kỳ %s", ky_str
+            )
+
+        for _ten, _kq in ket_qua.items():
+            if not _kq.thanh_cong:
+                logger.warning(
+                    "bom_snapshot_cdtotkvv_ky_cu %s: %s — %s", ky_str, _ten, _kq.thong_bao
+                )
+
+        db.ghi_audit(
+            username,
+            "bom_snapshot_cdtotkvv_ky_cu",
+            f"Kỳ {ky_str} — {len(frames)} file đơn vị, {fmt_so(len(df_cdto))} dòng"
+            + (f" | {len(loi)} lỗi" if loi else "")
+            + ("" if cbtd_data else " | chưa có CBTD"),
+        )
+
+        msg = (
+            f"✅ Đã bơm snapshot Tổ TK&VV kỳ **{ky_str}**: {len(frames)} file đơn vị · "
+            f"{fmt_so(len(df_cdto))} dòng · "
+            + " · ".join(f"{t} {'✅' if k.thanh_cong else '❌'}" for t, k in ket_qua.items())
+        )
+        if loi:
+            msg += f"\n\n⚠️ {len(loi)} file lỗi: " + "; ".join(loi[:5])
+        if not cbtd_data:
+            msg += (
+                "\n\n⚠️ Chưa có hồ sơ CBTD — chưa ghi snapshot CBTD–Tổ; "
+                "thêm CBTD ở tab CBTD rồi chạy lại để so sánh theo CBTD."
+            )
+        return KetQuaUpload(
+            bool(ket_qua["CDTOTKVV"].thanh_cong),
+            msg,
+        )
+    except Exception as e:
+        logger.error("bom_snapshot_cdtotkvv_ky_cu: kỳ %s — %s", ky_str, e, exc_info=True)
+        db.ghi_audit(username, "bom_snapshot_cdtotkvv_ky_cu_loi", f"Kỳ {ky_str}: {e}")
+        return KetQuaUpload(False, f"❌ Lỗi bơm snapshot CDTOTKVV kỳ {ky_str}: {e}")
+    finally:
+        for _p in ds_file_tam:
+            try:
+                if _p.exists():
+                    _p.unlink()
+            except OSError as e:
+                logger.warning(
+                    "bom_snapshot_cdtotkvv_ky_cu: không xóa được file tạm %s — %s", _p, e
+                )
+
+
 # ── Lưu file theo PGD ─────────────────────────────────────────────────────────
 
 def luu_pgd_file(ten_pgd: str, loai: str, file_bytes: bytes) -> KetQuaUpload:

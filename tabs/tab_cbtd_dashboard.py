@@ -2,9 +2,9 @@
 Tab Dashboard CBTD & Địa bàn — Tổng quan nhóm CBTD + ĐGD + Tổ TK&VV (NÂNG CẤP).
 
 Hiển thị:
-  - Row 1 : KPI cards (số CBTD, ĐGD, Tổ, điểm TB, %, workload)
+  - Row 1 : KPI cards (số CBTD, ĐGD, Tổ, điểm TB, %)
   - Row 1b: Bộ lọc tương tác PGD / Xã / CBTD
-  - Row 2 : Cảnh báo thông minh (7 loại) + bộ lọc loại cảnh báo
+  - Row 2 : Cảnh báo thông minh (5 loại) — bảng tổng hợp theo loại + nút xuất Excel chi tiết
   - Row 3 : 4 Biểu đồ Plotly nâng cao
   - Row 4 : Bảng xếp hạng CBTD (scorecard)
   - Row 5 : Bảng pivot CBTD → ĐGD → Tổ → điểm
@@ -13,6 +13,7 @@ Hiển thị:
 from __future__ import annotations
 
 from io import BytesIO
+from collections import Counter
 from datetime import datetime
 from typing import TYPE_CHECKING
 
@@ -28,14 +29,14 @@ from auth import la_phan_he_cn, la_executive, normalize_role
 from components.delta_card import kpi_row
 from data.khtd import doc_cbtd
 from tabs.base_tab import TabContext
-from utils import fmt_so, fmt_ty, hien_thi_dataframe_phan_trang, xuat_excel
+from utils import fmt_so, fmt_ty, hien_thi_dataframe_phan_trang, xuat_excel, ten_file_xuat
 from services.cbtd_dia_ban_service import (
     canh_bao_cbtd_dia_ban,
     lay_to_theo_cbtd,
     tom_tat_kpi,
     xep_hang_cbtd,
-    danh_gia_workload_cbtd,
     phan_tich_xu_huong_to,
+    _count_ap,
 )
 
 logger = get_logger(__name__)
@@ -150,7 +151,6 @@ def _build_bang_pivot(
     Pivot CBTD → ĐGD → Tổ → điểm thành DataFrame phẳng.
     """
     rows = []
-    wl = danh_gia_workload_cbtd(cbtd_data, dgd_map)
     for ma_cb, info in cbtd_data.items():
         pgd_cb = info.get("pgd", "—")
         ho_ten = info.get("ho_ten", "")
@@ -165,25 +165,15 @@ def _build_bang_pivot(
             if t.get("tong_diem") is not None and isinstance(t.get("tong_diem"), (int, float))
         ]
         diem_tb_cb = round(sum(diem_list) / len(diem_list), 1) if diem_list else None
-        wl_info = wl.get(ma_cb, {})
-        wl_loai = wl_info.get("loai", "")
-        wl_label = ""
-        if wl_loai == "quatai":
-            wl_label = "🔴 Quá tải"
-        elif wl_loai == "thieutai":
-            wl_label = "⚠️ Thiếu tải"
-        else:
-            wl_label = "✅ Cân bằng"
         rows.append({
             "Mã CBTD": ma_cb,
             "Họ tên": ho_ten,
             "PGD": pgd_cb,
             "Số ĐGD": len(ds_dgd),
-            "Số ấp": wl_info.get("so_ap", 0),
+            "Số ấp": _count_ap(pgd_cb, ds_dgd, dgd_map),
             "Số Tổ TK&VV": so_to,
             "Tổ TB/Yếu": to_yeu,
             "Điểm TB Tổ": f"{diem_tb_cb:.1f}" if diem_tb_cb is not None else "—",
-            "Workload": wl_label,
             "Trạng thái": (
                 "🔴 Có Tổ TB/Yếu" if to_yeu > 0
                 else ("✅ Tốt" if so_to > 0 else "⚠️ Chưa dữ liệu")
@@ -360,6 +350,180 @@ def _chart_xu_huong_3ky(xh: dict) -> go.Figure:
     return fig
 
 
+# ── Cảnh báo: nhãn loại, bảng tổng hợp & xuất chi tiết ───────────────────────
+
+_TEN_LOAI_CB = {
+    "dgd_thieu_cbtd":   "ĐGD thiếu CBTD",
+    "cbtd_qh_cao":      "CBTD QH cao",
+    "to_yeu_lien_tiep": "Tổ TB/Yếu 2+ kỳ",
+    "to_giam_diem_2ky": "Tổ điểm giảm 2 kỳ",
+    "dgd_khong_co_hs":  "ĐGD chưa có hồ sơ",
+}
+
+_MUC_DO_LOAI_CB = {
+    "dgd_thieu_cbtd":   "⚠️",
+    "cbtd_qh_cao":      "🔴",
+    "to_yeu_lien_tiep": "🔴",
+    "to_giam_diem_2ky": "⚠️",
+    "dgd_khong_co_hs":  "⚠️",
+}
+
+# Nhãn có icon — dùng cho bộ lọc multiselect
+_NHAN_LOAI_CB = {loai: f"{_MUC_DO_LOAI_CB[loai]} {ten}" for loai, ten in _TEN_LOAI_CB.items()}
+
+# Tên sheet Excel (không dùng "/" — ký tự cấm trong tên sheet)
+_TEN_SHEET_CB = {
+    "dgd_thieu_cbtd":   "ĐGD thiếu CBTD",
+    "cbtd_qh_cao":      "CBTD QH cao",
+    "to_yeu_lien_tiep": "Tổ TB_Yếu 2+ kỳ",
+    "to_giam_diem_2ky": "Tổ điểm giảm 2 kỳ",
+    "dgd_khong_co_hs":  "ĐGD chưa có hồ sơ",
+}
+
+# Thứ tự + nhãn cột chi tiết lấy từ canh_bao["chi_tiet"] của từng loại
+_COT_CHI_TIET_CB = {
+    "dgd_thieu_cbtd":   [("pgd", "PGD"), ("xa", "Xã"), ("dgd", "ĐGD")],
+    "dgd_khong_co_hs":  [("pgd", "PGD"), ("xa", "Xã"), ("dgd", "ĐGD"),
+                         ("so_thon", "Số ấp cấu hình")],
+    "cbtd_qh_cao":      [("ma_cb", "Mã CBTD"), ("ho_ten", "Họ tên"), ("ty_le_qh", "TL QH (%)"),
+                         ("tong_du_no", "Tổng dư nợ"), ("du_no_qh", "Dư nợ QH")],
+    "to_yeu_lien_tiep": [("ten_dv", "PGD"), ("ten_xa", "Xã"), ("ma_to", "Mã Tổ"),
+                         ("xep_loai", "Xếp loại"), ("tong_diem", "Tổng điểm")],
+    "to_giam_diem_2ky": [("ten_dv", "PGD"), ("ten_xa", "Xã"), ("ma_to", "Mã Tổ"),
+                         ("diem_truoc", "Điểm kỳ trước"), ("diem_hien", "Điểm kỳ này"),
+                         ("delta", "Chênh lệch")],
+}
+
+
+_EXCEL_SHEET_CHARS_CAM = set('[]:*?/\\')
+
+
+def _text_sach(v) -> str:
+    """Chuẩn hóa scalar để không lọt None/NaN/<NA> thành chuỗi giả trong bảng/Excel."""
+    if v is None:
+        return ""
+    try:
+        if pd.isna(v):
+            return ""
+    except (TypeError, ValueError):
+        pass
+    text = str(v).strip()
+    return "" if text.casefold() in {"nan", "none", "<na>", "nat"} else text
+
+
+def _bo_md(s) -> str:
+    """Bỏ markup ** để nội dung cảnh báo hiển thị sạch trong Excel."""
+    return _text_sach(s).replace("**", "")
+
+
+def _ten_sheet_canh_bao(loai: str, da_dung: set[str] | None = None) -> str:
+    """Tên sheet Excel hợp lệ, tối đa 31 ký tự và không trùng trong workbook."""
+    ten = _TEN_SHEET_CB.get(loai, loai) or "Khác"
+    ten = "".join("_" if ch in _EXCEL_SHEET_CHARS_CAM else ch for ch in str(ten)).strip(" '")
+    ten = ten or "Khác"
+    da_dung = da_dung or set()
+    base = ten[:31]
+    sheet = base
+    i = 2
+    while sheet in da_dung:
+        suffix = f"_{i}"
+        sheet = f"{base[:31 - len(suffix)]}{suffix}"
+        i += 1
+    return sheet
+
+
+def _lay_don_vi_canh_bao(c: dict, cbtd_data: dict) -> str:
+    """Lấy tên đơn vị (PGD) của 1 cảnh báo: ưu tiên chi_tiet, fallback tra theo mã CBTD."""
+    ct = c.get("chi_tiet") or {}
+    dv = _text_sach(ct.get("pgd")) or _text_sach(ct.get("ten_dv"))
+    ma_cb = _text_sach(ct.get("ma_cb"))
+    if not dv and ma_cb:
+        dv = _text_sach((cbtd_data.get(ma_cb) or {}).get("pgd"))
+    return dv
+
+
+def _bang_tong_hop_canh_bao(canh_baos: list[dict], cbtd_data: dict) -> pd.DataFrame:
+    """Gom cảnh báo theo loại → 1 dòng/loại: số lượng, số đơn vị, đơn vị nhiều nhất."""
+    if not canh_baos:
+        return pd.DataFrame()
+
+    nhom: dict[tuple[str, str], list[dict]] = {}
+    for c in canh_baos:
+        loai = _text_sach(c.get("loai")) or "khac"
+        muc_do = _text_sach(c.get("muc_do")) or _MUC_DO_LOAI_CB.get(loai, "")
+        nhom.setdefault((muc_do, loai), []).append(c)
+
+    tong = len(canh_baos)
+    rows = []
+    for (muc_do, loai), ds in nhom.items():
+        don_vi = [d for d in (_lay_don_vi_canh_bao(c, cbtd_data) for c in ds) if d]
+        nhieu_nhat = ""
+        if don_vi:
+            ten_dv, n = Counter(don_vi).most_common(1)[0]
+            nhieu_nhat = f"{ten_dv} ({n})"
+        rows.append({
+            "Mức độ": muc_do,
+            "Loại cảnh báo": _TEN_LOAI_CB.get(loai, loai),
+            "Số lượng": len(ds),
+            "% tổng": round(len(ds) / tong * 100, 1),
+            "Số đơn vị": len(set(don_vi)),
+            "Đơn vị nhiều nhất": nhieu_nhat,
+        })
+
+    df_th = pd.DataFrame(rows)
+    df_th["_r"] = df_th["Mức độ"].map(lambda m: 0 if "🔴" in str(m) else 1)
+    return (df_th.sort_values(["_r", "Số lượng"], ascending=[True, False])
+                 .drop(columns="_r")
+                 .reset_index(drop=True))
+
+
+def _xlsx_chi_tiet_canh_bao(canh_baos: list[dict], cbtd_data: dict) -> bytes:
+    """Excel chi tiết cảnh báo: Tổng hợp · Tất cả · 1 sheet cho mỗi loại cảnh báo."""
+    sheets: dict[str, pd.DataFrame] = {}
+
+    df_th = _bang_tong_hop_canh_bao(canh_baos, cbtd_data)
+    if not df_th.empty:
+        sheets["Tổng hợp"] = df_th
+
+    if canh_baos:
+        sheets["Tất cả cảnh báo"] = pd.DataFrame([
+            {
+                "Mức độ": c.get("muc_do", ""),
+                "Loại cảnh báo": _TEN_LOAI_CB.get(c.get("loai", ""), c.get("loai", "")),
+                "Đơn vị": _lay_don_vi_canh_bao(c, cbtd_data),
+                "Nội dung": _bo_md(c.get("noi_dung")),
+            }
+            for c in canh_baos
+        ])
+
+    nhom: dict[str, list[dict]] = {}
+    for c in canh_baos:
+        nhom.setdefault(str(c.get("loai", "khac")), []).append(c)
+
+    for loai, ds in nhom.items():
+        cap_cot = _COT_CHI_TIET_CB.get(loai, [])
+        doi_ten = dict(cap_cot)
+        rows = []
+        for c in ds:
+            row = {doi_ten.get(k, str(k)): v for k, v in (c.get("chi_tiet") or {}).items()}
+            don_vi = _lay_don_vi_canh_bao(c, cbtd_data)
+            if "PGD" in row and not _text_sach(row.get("PGD")):
+                row["PGD"] = don_vi
+            elif "PGD" not in row:
+                row["Đơn vị"] = don_vi
+            row["Nội dung"] = _bo_md(c.get("noi_dung"))
+            rows.append(row)
+        df_loai = pd.DataFrame(rows)
+        cot_dau = [h for _, h in cap_cot if h in df_loai.columns]
+        if "Đơn vị" in df_loai.columns:
+            cot_dau = ["Đơn vị"] + cot_dau
+        cot_giua = [col for col in df_loai.columns if col not in cot_dau and col != "Nội dung"]
+        cot_cuoi = ["Nội dung"] if "Nội dung" in df_loai.columns else []
+        sheets[_ten_sheet_canh_bao(loai, set(sheets))] = df_loai[cot_dau + cot_giua + cot_cuoi]
+
+    return xuat_excel(sheets)
+
+
 # ── Export builders ──────────────────────────────────────────────────────────
 
 def _xuat_excel_cross(
@@ -508,16 +672,6 @@ def render(tab: "DeltaGenerator | None" = None, **kwargs) -> None:
                     "value": fmt_so(kpi["so_to_tb_yeu"]),
                     "icon": "🔴" if kpi["so_to_tb_yeu"] > 0 else "🟢",
                 },
-                {
-                    "label": "CBTD quá tải",
-                    "value": fmt_so(kpi.get("so_cbtd_quatai", 0)),
-                    "icon": "🔥" if kpi.get("so_cbtd_quatai", 0) > 0 else "💚",
-                },
-                {
-                    "label": "CBTD thiếu tải",
-                    "value": fmt_so(kpi.get("so_cbtd_thieutai", 0)),
-                    "icon": "⚠️" if kpi.get("so_cbtd_thieutai", 0) > 0 else "💚",
-                },
             ],
             num_columns=4,
         )
@@ -548,15 +702,7 @@ def render(tab: "DeltaGenerator | None" = None, **kwargs) -> None:
                 loc_loai_cb = st.multiselect(
                     "Lọc theo loại cảnh báo", loai_hien_co, default=loai_hien_co,
                     key=f"{_kp}loc_loai_cb",
-                    format_func=lambda x: {
-                        "dgd_thieu_cbtd": "⚠️ ĐGD thiếu CBTD",
-                        "cbtd_qh_cao": "🔴 CBTD QH cao",
-                        "to_yeu_lien_tiep": "🔴 Tổ TB/Yếu 2+ kỳ",
-                        "cbtd_quatai": "🔴 CBTD quá tải",
-                        "cbtd_thieutai": "⚠️ CBTD thiếu tải",
-                        "to_giam_diem_2ky": "⚠️ Tổ điểm giảm",
-                        "dgd_khong_co_hs": "⚠️ ĐGD chưa có hồ sơ",
-                    }.get(x, x),
+                    format_func=lambda x: _NHAN_LOAI_CB.get(x, x),
                 )
             with f2:
                 loc_muc_do = st.multiselect(
@@ -576,42 +722,32 @@ def render(tab: "DeltaGenerator | None" = None, **kwargs) -> None:
             if not canh_baos_loc:
                 st.success("Mọi ĐGD đã có CBTD, không có CBTD QH cao, không có Tổ TB/Yếu liên tiếp.")
             else:
-                nhom_dgd = [c for c in canh_baos_loc if c["loai"] == "dgd_thieu_cbtd"]
-                nhom_qh = [c for c in canh_baos_loc if c["loai"] == "cbtd_qh_cao"]
-                nhom_to = [c for c in canh_baos_loc if c["loai"] == "to_yeu_lien_tiep"]
-                nhom_wl_qt = [c for c in canh_baos_loc if c["loai"] == "cbtd_quatai"]
-                nhom_wl_tt = [c for c in canh_baos_loc if c["loai"] == "cbtd_thieutai"]
-                nhom_giam = [c for c in canh_baos_loc if c["loai"] == "to_giam_diem_2ky"]
-                nhom_kohs = [c for c in canh_baos_loc if c["loai"] == "dgd_khong_co_hs"]
-
-                if nhom_dgd:
-                    st.markdown(f"**⚠️ ĐGD chưa có CBTD ({len(nhom_dgd)})**")
-                    for c in nhom_dgd:
-                        st.caption(f"• {c['noi_dung']}")
-                if nhom_qh:
-                    st.markdown(f"**🔴 CBTD có tỷ lệ QH cao ({len(nhom_qh)})**")
-                    for c in nhom_qh:
-                        st.warning(c["noi_dung"])
-                if nhom_to:
-                    st.markdown(f"**🔴 Tổ TB/Yếu liên tiếp 2+ tháng ({len(nhom_to)})**")
-                    for c in nhom_to:
-                        st.error(c["noi_dung"])
-                if nhom_wl_qt:
-                    st.markdown(f"**🔴 CBTD quá tải ({len(nhom_wl_qt)})**")
-                    for c in nhom_wl_qt:
-                        st.error(c["noi_dung"])
-                if nhom_wl_tt:
-                    st.markdown(f"**⚠️ CBTD thiếu tải ({len(nhom_wl_tt)})**")
-                    for c in nhom_wl_tt:
-                        st.caption(f"• {c['noi_dung']}")
-                if nhom_giam:
-                    st.markdown(f"**⚠️ Tổ điểm giảm 2 kỳ ({len(nhom_giam)})**")
-                    for c in nhom_giam:
-                        st.warning(c["noi_dung"])
-                if nhom_kohs:
-                    st.markdown(f"**⚠️ ĐGD chưa có hồ sơ vay ({len(nhom_kohs)})**")
-                    for c in nhom_kohs:
-                        st.caption(f"• {c['noi_dung']}")
+                df_th_cb = _bang_tong_hop_canh_bao(canh_baos_loc, cbtd_data)
+                st.caption("📊 Tổng hợp theo từng loại cảnh báo — danh sách chi tiết (mã Tổ / CBTD / ĐGD, đơn vị) "
+                           "tải bằng nút **Xuất chi tiết** bên dưới.")
+                st.dataframe(
+                    df_th_cb,
+                    hide_index=True,
+                    width="stretch",
+                    height=min(35 * (len(df_th_cb) + 1) + 3, 300),
+                    column_config={
+                        "Số lượng": st.column_config.NumberColumn("Số lượng", format="%d"),
+                        "% tổng": st.column_config.NumberColumn("% tổng", format="%.1f%%"),
+                        "Số đơn vị": st.column_config.NumberColumn("Số đơn vị", format="%d"),
+                    },
+                )
+                d1, d2 = st.columns([2, 3])
+                with d1:
+                    st.download_button(
+                        "📥 Xuất chi tiết cảnh báo (Excel)",
+                        data=_xlsx_chi_tiet_canh_bao(canh_baos_loc, cbtd_data),
+                        file_name=ten_file_xuat("Canh_bao_CBTD_dia_ban"),
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key=f"{_kp}cbtd_dl_chi_tiet_canh_bao",
+                    )
+                with d2:
+                    st.caption("File gồm: sheet **Tổng hợp** · **Tất cả cảnh báo** "
+                               "· 1 sheet chi tiết cho mỗi loại cảnh báo (theo đúng bộ lọc đang chọn).")
 
         st.divider()
 
@@ -874,22 +1010,16 @@ def render(tab: "DeltaGenerator | None" = None, **kwargs) -> None:
                 # --- KPI row ---
                 story.append(Paragraph("📊 Tổng quan", h3))
                 tong_cb = kpi_loc.get("tong_cbtd", 0) or len(xh_df)
-                so_qt = kpi_loc.get("so_cbtd_quatai", 0)
-                so_tt = kpi_loc.get("so_cbtd_thieutai", 0)
                 tl_qh_tb = round(float(xh_df["TL_QH_pct"].mean()), 2) if "TL_QH_pct" in xh_df.columns and not xh_df.empty else 0.0
                 kpi_row_data = [[
                     Paragraph("Tổng CBTD", th_s),
-                    Paragraph("🔴 Quá tải", th_s),
-                    Paragraph("⚠️ Thiếu tải", th_s),
                     Paragraph("TB % QH toàn hệ thống", th_s),
                 ], [
                     Paragraph(str(tong_cb), td_s),
-                    Paragraph(str(so_qt), td_s),
-                    Paragraph(str(so_tt), td_s),
                     Paragraph(f"{tl_qh_tb:,.2f} %".replace(",", "X").replace(".", ",").replace("X", "."), td_s),
                 ]]
                 tbl_kpi = Table(kpi_row_data,
-                                colWidths=[(page_w-2*_MARGIN)/4]*4, hAlign="CENTER")
+                                colWidths=[(page_w-2*_MARGIN)/2]*2, hAlign="CENTER")
                 tbl_kpi.setStyle(TableStyle([
                     ("BACKGROUND", (0, 0), (-1, 0), _VBSP_GREEN),
                     ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
@@ -1025,9 +1155,7 @@ def render(tab: "DeltaGenerator | None" = None, **kwargs) -> None:
             if st.button("🏆 Tạo PDF Xếp hạng", key=f"{_kp}cbtd_db_btn_pdf_rank"):
                 try:
                     kpi_for_pdf = {
-                        "tong_cbtd": tong_cbtd,
-                        "so_cbtd_quatai": so_quatai,
-                        "so_cbtd_thieutai": so_thieutai,
+                        "tong_cbtd": len(df_xep_hang),
                     }
                     pdf_rank_bytes = _xuat_pdf_rank_cbtd(df_xep_hang, kpi_for_pdf)
                     if pdf_rank_bytes:

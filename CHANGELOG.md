@@ -1,5 +1,91 @@
 # CHANGELOG
 
+## [2026-09-13] — Dashboard CBTD & Địa bàn: bỏ báo cáo "quá tải/thiếu tải" CBTD
+- `services/cbtd_dia_ban_service.py` — Xóa hẳn `danh_gia_workload_cbtd()`; bỏ 3 hằng số ngưỡng `_NGUONG_DGD_QUA_TAI`/`_NGUONG_AP_QUA_TAI`/`_NGUONG_DGD_THIEU_TAI`; `canh_bao_cbtd_dia_ban()` bỏ nhánh sinh cảnh báo `cbtd_quatai`/`cbtd_thieutai` (và 3 tham số ngưỡng tương ứng); `tom_tat_kpi()` bỏ 2 trường `so_cbtd_quatai`/`so_cbtd_thieutai`.
+- `tabs/tab_cbtd_dashboard.py` — Bỏ 2 KPI card "CBTD quá tải"/"CBTD thiếu tải"; bỏ cột "Workload" trong bảng pivot (thay `so_ap` bằng `_count_ap()`); bỏ `cbtd_quatai`/`cbtd_thieutai` khỏi 4 map `_TEN_LOAI_CB`/`_MUC_DO_LOAI_CB`/`_TEN_SHEET_CB`/`_COT_CHI_TIET_CB`; PDF xếp hạng bỏ 2 cột "Quá tải"/"Thiếu tải"; sửa `kpi_for_pdf` dùng `len(df_xep_hang)` (trước đây tham chiếu biến `tong_cbtd`/`so_quatai`/`so_thieutai` không tồn tại → bấm nút PDF sẽ NameError).
+- Cảnh báo thông minh giờ còn 5 loại (trước 7): ĐGD thiếu CBTD, CBTD QH cao, Tổ TB/Yếu 2+ kỳ, Tổ điểm giảm 2 kỳ, ĐGD chưa có hồ sơ.
+
+## [2026-09-13] — Sửa "Trạng thái hệ thống" báo thiếu HSTD dù KH-NV đã upload đủ
+- `tabs/tab_trang_thai_nguon.py` ~dòng 119-133 — `_pgd_file_path()`: với `loai == "hstd"` dùng `duong_dan_hstd_hien_hanh()` (chọn file mới hơn giữa `hstd_latest.xlsx` của PGD và `hstd_khnv.xlsx` của KH-NV) thay vì chỉ check `hstd_latest.xlsx`.
+- `BUGMAP.md` — Thêm `E25`.
+
+## [2026-09-13] — Tách "Vay trực tiếp NOXH" thành tab ngang cấp với "Cán bộ tín dụng"
+- `tabs/tab_vay_noxh.py` — File mới: tách toàn bộ helper NOXH (`_loc_vay_truc_tiep_noxh`, `_gioi_han_noxh_theo_pgd`, `_co_quyen_quan_ly_noxh`, `_noxh_*`, `_tao_bang_theo_doi_noxh`, `_chuan_bi_pdf_noxh`) và `render()` riêng theo pattern chuẩn (giữ nguyên KPI, bộ lọc, giao/cập nhật/gỡ, audit, xuất Excel/PDF).
+- `tabs/tab_cbtd.py` — Gỡ sub-tab "🏠 Vay trực tiếp NOXH" (`xem4`) và toàn bộ helper NOXH; dọn import thừa (`COT_TEN_XA`, `COT_TEN_KH`, `COT_NGAY_VAY`, `COT_NGAY_DH`, `COT_MA_CHUONG_TRINH`, `timedelta`).
+- `workspaces/ws_management.py` — Nhóm "CBTD & Địa bàn" thêm sub-tab "🏠 Vay trực tiếp NOXH" ngang cấp.
+- `workspaces/ws_operation.py` — Thêm mục "🏠 Vay trực tiếp NOXH" vào menu + tabs phân hệ PGD.
+- `tests/test_tab_cbtd_add_form.py` — Trỏ các test NOXH sang `tabs.tab_vay_noxh`.
+
+## [2026-09-13] — Bảng "Dư nợ theo CBTD quản lý địa bàn" hiển thị đủ 17 cột (hết bị cắt mép phải)
+- `utils_theme.py` ~dòng 592 — Thêm nhóm CSS `.cdp-fit` / `.cdp-fit-t` / `td.cdp-txt` / `td.cdp-stt` cho bảng rộng nhiều cột: `.cdp-fit` override `overflow:hidden` của `.cdp-wrap` thành `overflow-x:auto` (không còn cắt mất cột phải), `.cdp-fit-t` giảm font `.72rem` + padding ô `3px 4px`, header cho phép xuống dòng (`white-space:normal`, `.56rem`) và cột text (Mã CBTD / Họ tên / PGD) được wrap.
+- `tabs/tab_cbtd.py` ~dòng 427 — `_td()` thêm tham số `cls: str = ""` để gắn class cho ô (giữ nguyên `style='text-align:left'` khi `align="left"`).
+- `tabs/tab_cbtd.py` ~dòng 440 `_html_bang_du_no()` — wrapper đổi thành `class="cdp-wrap cdp-fit"`, table `class="cdp-table cdp-fit-t"`; ô STT gắn `cdp-stt`, ô Mã CBTD / Họ tên / PGD gắn `cdp-txt`.
+- `tabs/tab_cbtd.py` ~dòng 512 `_html_bang_no_quan_tam()` — áp cùng bộ class để bảng 13 cột "Cụm chỉ tiêu nợ cần quan tâm" cũng hiển thị đủ.
+- `BUGMAP.md` — Thêm `B103`.
+
+## [2026-09-13] — Mã CBTD cho nhập tự do (bỏ bắt buộc tiền tố `CB`)
+- `tabs/tab_cbtd.py` ~dòng 670 — `_MA_CB_REGEX` đổi từ `^CB[A-Z0-9_-]{2,}$` sang `^[^\s/\\:*?"<>|]{2,30}$`: nhập tự do, chỉ chặn khoảng trắng và ký tự không an toàn cho tên file (mã được ghép vào `CBTD_{mã}_..._HoSoNangLuc.pdf`).
+- `tabs/tab_cbtd.py` ~dòng 694 — `_validate_ma_cb()` đổi message lỗi thành hướng dẫn 2-30 ký tự / không khoảng trắng / ký tự bị cấm. Giữ nguyên kiểm tra trùng key và `bo_qua_ma`.
+- `tabs/tab_cbtd.py` ~dòng 720 — `_pgd_slug_ma()` đổi sang `re.sub(r"\W+", "_", ...)` (Unicode-aware) để mã CBTD tiếng Việt không bị slug rỗng về `"CN"` → tránh `DuplicateElementKey` ở form "✏️ Chỉnh sửa" (`edit_kp`).
+- `tabs/tab_cbtd.py` ~dòng 1974 — Form "➕ Thêm mới": thêm `placeholder` và `help` mới cho ô Mã CBTD (nêu rõ không bắt buộc tiền tố `CB`, để trống vẫn tự sinh `CB_<PGD>_<số>`).
+- `tabs/tab_cbtd.py` ~dòng 2430 — Form "🪪 Đổi mã CBTD": nhãn đổi thành "(tự do, không khoảng trắng)", `placeholder` cập nhật.
+- `BUGMAP.md` — Thêm `B102`.
+
+## [2026-09-13] — Bảng "Tổng hợp dư nợ theo CBTD": tách đúng phạm vi, thêm dòng Chưa phân công, khử đếm trùng
+- `tabs/tab_cbtd.py` ~dòng 2873-2916 — Thay `df_joined` (lọc HTV=1 bằng so sánh thô `!= 1`) bằng `df_joined_all` + `_mask_htv1` dùng `pd.to_numeric(...) == 1`; thêm `_mask_scope` giới hạn ở các PGD đã có CBTD được gán ĐGD (so `casefold`); sinh 3 tập `_df_vt` / `_df_chua_pc` / `_df_scope`. Thêm helper lồng `_agg_dong(d) -> (số KH, số món, tổng dư nợ, dư nợ QH)` dùng chung cho mọi dòng; bỏ 4 biến cộng dồn `_t_so_kh`/`_t_so_mon`/`_t_tdn`/`_t_dqh`.
+- `tabs/tab_cbtd.py` ~dòng 2952-3008 — Dòng `VAY TRỰC TIẾP (HTV=1)` nay chỉ tính trong phạm vi PGD đã cấu hình CBTD (trước: toàn CN 22 đơn vị). Thêm dòng mới `CHƯA PHÂN CÔNG CBTD` (HTV≠1, trong phạm vi, chưa khớp CBTD nào). `TỔNG CỘNG` tính `nunique`/`sum` một lần trên `_df_scope` thay vì cộng dồn từng CBTD, cột PGD ghi rõ phạm vi, kèm `st.caption` giải thích công thức đối chiếu.
+- `tabs/tab_cbtd.py` ~dòng 3018 — Nút "📥 Xuất báo cáo CBTD" thêm 2 sheet `Vay truc tiep HTV1` và `Chua phan cong CBTD`.
+- `data/khtd.py` ~dòng 150-172 — `_normalize_cbtd_join_text()` và `_normalize_cbtd_join_series()` gom khoảng trắng liên tiếp (`re.sub(r"\s+", " ")` / `.str.replace(r"\s+", " ", regex=True)`) trước khi lower, để tên thôn `"Khu phố  Tân Hạnh 1"` (2 khoảng trắng) khớp với `"Khu phố Tân Hạnh 1"`.
+- `data/khtd.py` ~dòng 90-114 — `lay_ap_tu_dgd_list()` gom khoảng trắng tên ấp và khử trùng theo `set` key `(xã_lower, ấp_lower)`, giữ thứ tự xuất hiện đầu tiên → "Số ấp" không còn đếm dư.
+- `BUGMAP.md` — Thêm `C61` (TỔNG CỘNG trộn phạm vi + thiếu dòng chưa phân công + đếm trùng KH/món) và `J90` (dgd_map lưu 2 biến thể khoảng trắng cho cùng một ấp).
+
+## [2026-09-13] — Chốt chặn xung đột baseline 31/12 khi bơm snapshot kỳ cũ
+- `tabs/tab_so_sanh_ky/__init__.py` — Thêm helper `_ky_la_thang_12(ky)` nhận diện kỳ dạng `YYYY-12` (mốc baseline 31/12). Khi bơm kỳ cũ vào tháng 12: hiện `st.warning` giải thích chồng lấn với luồng baseline chính thống `merge_baseline_toan_cn`, kiểm tra `baseline_cache_loai(nam,"hstd")` để báo ĐÃ/CHƯA có cache baseline (`st.info`), và yêu cầu tick `st.checkbox` xác nhận (`ql_snap_bom_xac_nhan_baseline`) mới cho phép bấm nút bơm (gate cả 2 nút HSTD/CDTOTKVV). Kỳ tháng lẻ không bị chặn.
+
+## [2026-09-13] — Bơm snapshot kỳ cũ cho chấm điểm Tổ TK&VV (CDTOTKVV)
+- `services/upload_service.py` — Thêm `bom_snapshot_cdtotkvv_ky_cu(ky, files, username)`: ghi `cdtotkvv_snapshot` + `cbtd_to_tkvv_snapshot` cho kỳ cũ từ file chấm điểm Tổ TK&VV (hỗ trợ 1 file toàn CN tự tách 22 đơn vị qua `tach_file_cdto_toan_cn`, hoặc nhiều file từng đơn vị qua `doc_cdtotkvv_path`); dùng CBTD/ĐGD mapping hiện tại; KHÔNG đụng cache hay pgd_data; audit `bom_snapshot_cdtotkvv_ky_cu`.
+- `tabs/tab_so_sanh_ky/__init__.py` — UI "📥 Bơm snapshot kỳ cũ" thêm radio "Loại dữ liệu" (HSTD / CDTOTKVV); nhánh CDTOTKVV bỏ bước nhận diện đơn vị (đơn vị nằm trong nội dung file) và gọi `bom_snapshot_cdtotkvv_ky_cu`.
+- `tests/test_bom_snapshot_ky_cu.py` — Thêm 17 unit test (mock phụ thuộc nặng) cho `bom_snapshot_ky_cu`, `bom_snapshot_cdtotkvv_ky_cu`, `chay_lai_snapshot_ky_hien_tai`: kỳ sai, file rỗng, luồng toàn CN/per-unit, thiếu CBTD, snapshot lỗi, không ghi đè cache, dọn file tạm.
+
+## [2026-09-13] — Nâng cấp hệ snapshot: bơm kỳ cũ không cần upload lại kỳ mới nhất
+- `services/upload_service.py` — Thêm `bom_snapshot_ky_cu(ky, files_theo_don_vi, username, loai)`: ghi snapshot HSTD/Thôn/Ủy thác cho một kỳ cũ từ file từng đơn vị, KHÔNG ghi đè `cache/hstd.parquet`, kiểm tra ngày cuối kỳ, audit `bom_snapshot_ky_cu`, dọn file tạm trong `finally`.
+- `services/upload_service.py` — Thêm `chay_lai_snapshot_ky_hien_tai(username, progress_cb)`: chạy ĐỒNG BỘ toàn bộ snapshot (HSTD/Thôn/Ủy thác/CDTOTKVV/CBTD–Tổ) từ cache hiện tại, có progress callback, audit, clear cache.
+- `tabs/tab_so_sanh_ky/__init__.py` — Mục "🧭 Quản lý snapshot": thêm ma trận Kỳ × Loại (`_build_matrix_ky_loai`), UI "🔁 Chạy lại snapshot kỳ hiện tại" (B3) và "📥 Bơm snapshot kỳ cũ" (B2 — upload nhiều file hoặc quét thư mục, tự nhận diện đơn vị qua `tim_ten_pgd_tu_noi_dung`, báo đơn vị thiếu).
+- `tabs/tab_cbtd.py` — Khối Tổng quan CBTD và `_render_g3` dùng `ky_thang_truoc()`/`ky_baseline()` trên `danh_sach_ky_thon()` thay vì tính tay chuỗi kỳ; guard khi kỳ trước không có snapshot (tránh hiển thị `None`).
+- `services/migration_service.py` — Bỏ `except Exception: pass` khi gọi snapshot tổng hợp, thay bằng `logger.error(..., exc_info=True)`.
+- `tabs/tab_so_sanh_ky/__init__.py` — `_SNAPSHOT_META` bổ sung `Thôn` (thon_snapshot) và `CBTD–Tổ` (cbtd_to_tkvv_snapshot) để inventory hiển thị đủ các bảng.
+
+## [2026-09-13] — In PDF tổng quan theo dõi vay trực tiếp NOXH
+- `tabs/tab_cbtd.py` — Thêm nút tạo/tải PDF theo đúng bộ lọc NOXH đang xem; báo cáo A4 ngang gồm 11 cột cốt lõi, dư nợ theo triệu đồng và dòng tổng cộng.
+- `tests/test_tab_cbtd_add_form.py` — Thêm regression cho dữ liệu PDF NOXH và xác nhận file tạo ra đúng định dạng `%PDF`.
+
+## [2026-09-13] — Phân công và theo dõi vay trực tiếp NOXH theo CBTD
+- `tabs/tab_cbtd.py` — Đổi sub-tab vay trực tiếp thành danh sách riêng chương trình 12 (NOXH), chỉ lấy món HTV=1 còn dư nợ; thêm KPI, bộ lọc, tìm kiếm, xuất Excel, giao CBTD, trạng thái kiểm tra, lịch hẹn, kết quả, ghi chú và cảnh báo quá hạn theo dõi.
+- `tabs/tab_cbtd.py` — Giới hạn dữ liệu theo PGD đang đăng nhập/bộ lọc theo hướng fail-closed; buộc chọn một PGD và chỉ cho giao CBTD cùng PGD; chỉ `admin_cn` và `manager_cn` được giao, cập nhật hoặc gỡ; mọi lần ghi KV đều có audit ngay sau đó.
+- `tests/test_tab_cbtd_add_form.py` — Thêm regression cho bộ lọc NOXH/PGD, trường hợp thiếu cột địa bàn, dữ liệu `pd.NA`, ghép phân công, cảnh báo lịch hẹn/quá 30 ngày và ma trận quyền quản lý.
+- `BUGMAP.md` — Ghi nhận lỗi I10 về lộ dữ liệu toàn Chi nhánh và thiếu chặn quyền ghi ở sub-tab vay trực tiếp cũ.
+
+## [2026-09-13] — Dashboard CBTD & Địa bàn: mục Cảnh báo hiển thị dạng tổng hợp + nút xuất chi tiết Excel
+- `tabs/tab_cbtd_dashboard.py` — Bỏ liệt kê từng dòng cảnh báo (`st.error`/`st.warning`/`st.caption` cho 52+ mục) trong expander "🔔 Cảnh báo"; thay bằng bảng tổng hợp theo loại (Mức độ | Loại cảnh báo | Số lượng | % tổng | Số đơn vị | Đơn vị nhiều nhất, 🔴 xếp trước) + nút "📥 Xuất chi tiết cảnh báo (Excel)" ngay dưới bảng.
+- `tabs/tab_cbtd_dashboard.py` — Thêm helper `_bang_tong_hop_canh_bao()`, `_xlsx_chi_tiet_canh_bao()`, `_lay_don_vi_canh_bao()`, `_bo_md()` và các map `_TEN_LOAI_CB` / `_MUC_DO_LOAI_CB` / `_NHAN_LOAI_CB` / `_TEN_SHEET_CB` / `_COT_CHI_TIET_CB`; file Excel xuất ra gồm sheet Tổng hợp · Tất cả cảnh báo · 1 sheet chi tiết cho mỗi loại (theo đúng bộ lọc loại/mức độ đang chọn).
+- `tabs/tab_cbtd_dashboard.py` — Multiselect "Lọc theo loại cảnh báo" dùng lại `_NHAN_LOAI_CB` thay vì dict inline; import thêm `Counter` (collections) và `ten_file_xuat` (utils).
+- `tabs/tab_cbtd_dashboard.py` — Review/fix helper cảnh báo: chuẩn hóa `None`/`NaN`/`pd.NA` để không lọt thành chuỗi giả hoặc crash trong `_bo_md()`; sanitize tên sheet Excel và chống trùng; bổ sung fallback PGD sạch khi chi tiết cảnh báo thiếu đơn vị.
+- `tests/test_tab_cbtd_dashboard.py` — Thêm regression cho bảng tổng hợp cảnh báo và Excel chi tiết (fallback đơn vị theo `ma_cb`, nội dung bỏ markdown, sheet name hợp lệ, không có `nan`/`<NA>`).
+
+## [2026-09-13] — Review bảng dư nợ CBTD dồn và PDF tổng hợp
+- `tabs/tab_cbtd.py` — Dữ liệu delta `NaN` hiển thị `—` thay vì `0`; PDF dùng dòng TỔNG đã tính sẵn, không cộng thêm dòng tổng lần hai; tách helper `_chuan_bi_pdf_bang_du_no()` để giữ dấu `—` cho delta thiếu kỳ khi xuất PDF.
+- `tests/test_tab_cbtd_add_form.py` — Bổ sung regression cho 17 cột HTML, delta thiếu kỳ, tổng KH/món/nợ khoanh, cấu hình dòng tổng PDF và dữ liệu PDF không ép delta thiếu kỳ thành `0`.
+- `BUGMAP.md` — Ghi nhận lỗi delta thiếu dữ liệu và tổng PDF bị nhân đôi.
+
+## [2026-09-13] — Tổng quan CBTD: thêm cột Kh vay vốn / Món vay / Khoanh cho khớp mẫu biểu
+- `services/cbtd_dia_ban_service.py` — `tong_hop_hstd_theo_cbtd()` thêm cột `Du_no_khoanh` (tổng `COT_DU_NO_KHOANH` theo từng CBTD, thiếu cột nguồn → 0).
+- `tabs/tab_cbtd.py` — `_tao_bang_tong_hop()` lấy thêm `So_KH`, `So_mon_vay`, `Du_no_khoanh` (cộng dồn ở dòng TỔNG); `_html_bang_du_no()` thêm 2 cột đếm "Kh vay vốn"/"Món vay", nhóm "Trong đó" thành 3 cột (Trong hạn/Quá hạn/Khoanh), dời "TL QH (%)" về cuối bảng đúng mẫu biểu; export Excel/PDF thêm thứ tự cột `_thu_tu_th`, quy triệu cột Khoanh, đếm cột Kh vay vốn/Món vay; bảng chi tiết Nhóm 3 format + đổi tên `Du_no_khoanh` → "DN khoanh (triệu)".
+
+## [2026-09-13] — Tổng quan CBTD: dồn dư nợ vào 1 bảng nhóm header giống mẫu biểu VBSP
+- `tabs/tab_cbtd.py` — Thay 10 bảng xếp hạng tản mác bằng 1 bảng "Dư nợ theo CBTD quản lý địa bàn" (Tổng dư nợ | Trong đó: Trong hạn/Quá hạn | TL QH | Cho vay/Thu nợ | Dư nợ tăng/giảm so tháng trước & 31/12 năm trước | Quá hạn tăng/giảm tương tự) + bảng "Cụm chỉ tiêu nợ cần quan tâm" (đến hạn / 3T KHĐ / rủi ro kèm Δ); helper mới `_tao_bang_tong_hop()`, `_tao_bang_no_quan_tam()`, `_html_bang_du_no()`, `_html_bang_no_quan_tam()` (HTML header 2 hàng, class `.cdp-*`); xóa `_tao_bang_xep_hang()`, `_hien_thi_bxh()`; Excel/PDF xuất theo bảng dồn.
+- `tabs/tab_cbtd_dashboard.py` — Fix bảng Scorecard hiển thị ",0f"/",2f" do format NumberColumn sai: chuyển sang Styler `.format()` kiểu VN và dùng lại `styled` (trước đây bỏ quên nên mất màu Xếp loại).
+- `tests/test_tab_cbtd_add_form.py` — Regression chuyển sang `_tao_bang_tong_hop()` (thứ hạng giảm dần, Δ NaN, dòng TỔNG, TL QH dòng tổng).
+
 ## [2026-09-13] — Bổ sung smoke test cho Dashboard CBTD & Địa bàn
 - `tests/test_smoke_imports.py` — Đưa `tabs.tab_cbtd_dashboard` vào danh sách kiểm tra import và gọi `render()` để phát hiện sớm lỗi runtime sau thay đổi UI.
 

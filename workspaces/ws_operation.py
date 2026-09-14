@@ -623,6 +623,7 @@ _WS_OP_MENU_ITEMS = [
             {"label": "✅ Checklist Nội bộ PGD"},
             {"label": "🔍 Kiểm soát Dữ liệu"},
             {"label": "👔 CBTD & Địa bàn"},
+            {"label": "🏠 Vay trực tiếp NOXH"},
             {"label": "💳 Xử lý Rủi ro"},
             {"label": "📈 Phân tích NQH"},
             {"label": "📍 Điểm Giao Dịch"},
@@ -1050,6 +1051,12 @@ def render(**kwargs):
                 ("🔍 Kiểm soát Dữ liệu", lambda tab: _lazy_tab("tab_kiem_soat_du_lieu_pgd").render(tab, df=df_pgd, pgd_user=pgd_user or pgd_filter or "", role=role, username=username)),
 
                 ("👔 CBTD & Địa bàn", lambda tab: _lazy_tab("tab_cbtd").render(
+
+                    tab, df=df_pgd, role=role, username=username, pgd_user=pgd_user or pgd_filter or ""
+
+                )),
+
+                ("🏠 Giao quản lý NOXH trực tiếp", lambda tab: _lazy_tab("tab_vay_noxh").render(
 
                     tab, df=df_pgd, role=role, username=username, pgd_user=pgd_user or pgd_filter or ""
 

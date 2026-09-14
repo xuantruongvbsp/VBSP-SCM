@@ -5,7 +5,6 @@ Cung cấp:
   - lay_to_theo_cbtd()           : cross-join CBTD → ĐGD → Tổ TK&VV
   - canh_bao_cbtd_dia_ban()      : tổng hợp cảnh báo thông minh
   - tom_tat_kpi()                : dict KPI cho Dashboard
-  - danh_gia_workload_cbtd()     : đánh giá tải CBTD (quá tải / thiếu tải / cân bằng)
   - xep_hang_cbtd()              : bảng xếp hạng CBTD theo nhiều tiêu chí
   - phan_tich_xu_huong_to()      : xu hướng chất lượng Tổ qua các kỳ
   - so_huu_cbtd_full()           : vector-optimised map (xa, thon) → (ma_cb, ten_cb, ten_xa_dgd)
@@ -68,9 +67,6 @@ if TYPE_CHECKING:
 
 
 # ── Thresholds (có thể override khi gọi hàm) ─────────────────────────────────
-_NGUONG_DGD_QUA_TAI: int = 5
-_NGUONG_AP_QUA_TAI: int = 30
-_NGUONG_DGD_THIEU_TAI: int = 1
 _NGUONG_TO_XEP_LOAI_2KY: int = 2
 
 
@@ -259,15 +255,12 @@ def canh_bao_cbtd_dia_ban(
     df_cdtotkvv: "pd.DataFrame | None",
     df_cdtotkvv_truoc: "pd.DataFrame | None" = None,
     nguong_qh_pct: float = 2.0,
-    nguong_dgd_quatai: int = _NGUONG_DGD_QUA_TAI,
-    nguong_ap_quatai: int = _NGUONG_AP_QUA_TAI,
-    nguong_dgd_thieutai: int = _NGUONG_DGD_THIEU_TAI,
 ) -> list[dict]:
     """
     Tổng hợp cảnh báo. Trả về list[dict]:
         {
             "loai":   "dgd_thieu_cbtd" | "cbtd_qh_cao" | "to_yeu_lien_tiep"
-                    | "cbtd_quatai" | "cbtd_thieutai" | "to_giam_diem_2ky" | "dgd_khong_co_hs",
+                    | "to_giam_diem_2ky" | "dgd_khong_co_hs",
             "muc_do": "🔴" | "⚠️",
             "noi_dung": str,
             "chi_tiet": dict,
@@ -297,37 +290,6 @@ def canh_bao_cbtd_dia_ban(
                         "noi_dung": f"ĐGD **{dgd_name}** ({pgd_k} / {xa_k}) chưa có CBTD phụ trách",
                         "chi_tiet": {"pgd": pgd_k, "xa": xa_k, "dgd": dgd_name},
                     })
-
-    # ── 1b. CBTD quá tải / thiếu tải ────────────────────────────────────────
-    try:
-        wl = danh_gia_workload_cbtd(cbtd_data, dgd_map,
-                                     nguong_dgd_quatai=nguong_dgd_quatai,
-                                     nguong_ap_quatai=nguong_ap_quatai,
-                                     nguong_dgd_thieutai=nguong_dgd_thieutai)
-        for ma_cb, info in wl.items():
-            loai_wl = info.get("loai")
-            if loai_wl == "quatai":
-                canh_baos.append({
-                    "loai": "cbtd_quatai",
-                    "muc_do": "🔴",
-                    "noi_dung": (
-                        f"CBTD **{ma_cb} — {info['ho_ten']}** ({info['pgd']}) "
-                        f"quá tải: {info['so_dgd']} ĐGD / {info['so_ap']} ấp"
-                    ),
-                    "chi_tiet": {"ma_cb": ma_cb, **{k: v for k, v in info.items() if k != "loai"}},
-                })
-            elif loai_wl == "thieutai":
-                canh_baos.append({
-                    "loai": "cbtd_thieutai",
-                    "muc_do": "⚠️",
-                    "noi_dung": (
-                        f"CBTD **{ma_cb} — {info['ho_ten']}** ({info['pgd']}) "
-                        f"thiếu tải: chỉ {info['so_dgd']} ĐGD / {info['so_ap']} ấp"
-                    ),
-                    "chi_tiet": {"ma_cb": ma_cb, **{k: v for k, v in info.items() if k != "loai"}},
-                })
-    except Exception as e:
-        logger.error("canh_bao workload: %s", e, exc_info=True)
 
     # ── 2. CBTD có tỷ lệ QH cao ──────────────────────────────────────────────
     if df_hstd is not None and not df_hstd.empty and cbtd_data:
@@ -487,8 +449,7 @@ def tom_tat_kpi(
     """
     Trả về dict KPI:
         so_cbtd, so_dgd_tong, so_dgd_chua_phan,
-        so_to_tong, diem_tb, pct_to_dat, so_to_yeu, so_to_tb_yeu,
-        so_cbtd_quatai, so_cbtd_thieutai
+        so_to_tong, diem_tb, pct_to_dat, so_to_yeu, so_to_tb_yeu
     """
     # ĐGD
     so_dgd_tong = sum(
@@ -524,20 +485,6 @@ def tom_tat_kpi(
             so_to_dat = int(df_cdtotkvv["xep_loai"].isin({"Tốt", "Khá"}).sum())
             pct_to_dat = round(so_to_dat / so_to_tong * 100, 1) if so_to_tong else 0.0
 
-    # Workload CBTD
-    so_cbtd_quatai = 0
-    so_cbtd_thieutai = 0
-    try:
-        wl = danh_gia_workload_cbtd(cbtd_data, dgd_map)
-        for info in wl.values():
-            l = info.get("loai")
-            if l == "quatai":
-                so_cbtd_quatai += 1
-            elif l == "thieutai":
-                so_cbtd_thieutai += 1
-    except Exception:
-        pass
-
     return {
         "so_cbtd":          len(cbtd_data),
         "so_dgd_tong":      so_dgd_tong,
@@ -547,48 +494,7 @@ def tom_tat_kpi(
         "pct_to_dat":       pct_to_dat,
         "so_to_yeu":        so_to_yeu,
         "so_to_tb_yeu":     so_to_tb_yeu,
-        "so_cbtd_quatai":   so_cbtd_quatai,
-        "so_cbtd_thieutai": so_cbtd_thieutai,
     }
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Workload CBTD đánh giá
-# ─────────────────────────────────────────────────────────────────────────────
-
-def danh_gia_workload_cbtd(
-    cbtd_data: dict,
-    dgd_map: dict,
-    nguong_dgd_quatai: int = _NGUONG_DGD_QUA_TAI,
-    nguong_ap_quatai: int = _NGUONG_AP_QUA_TAI,
-    nguong_dgd_thieutai: int = _NGUONG_DGD_THIEU_TAI,
-) -> dict[str, dict]:
-    """
-    Đánh giá mỗi CBTD là quá tải / cân bằng / thiếu tải.
-    Trả về {ma_cb: {ho_ten, pgd, so_dgd, so_ap, loai}} — loai ∈ {"quatai","canbang","thieutai"}.
-    """
-    ket_qua: dict[str, dict] = {}
-    for ma_cb, info in (cbtd_data or {}).items():
-        pgd = info.get("pgd", "")
-        ds_dgd = info.get("ds_dgd", []) or []
-        so_dgd = len(ds_dgd)
-        so_ap = _count_ap(pgd, ds_dgd, dgd_map)
-
-        if so_dgd >= nguong_dgd_quatai or so_ap >= nguong_ap_quatai:
-            loai = "quatai"
-        elif so_dgd <= nguong_dgd_thieutai and so_ap > 0:
-            loai = "thieutai"
-        else:
-            loai = "canbang"
-
-        ket_qua[ma_cb] = {
-            "ho_ten": info.get("ho_ten", ""),
-            "pgd":    pgd,
-            "so_dgd": so_dgd,
-            "so_ap":  so_ap,
-            "loai":   loai,
-        }
-    return ket_qua
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -752,7 +658,7 @@ def tong_hop_hstd_theo_cbtd(
     """
     columns = [
         "Ma_CBTD", "Ho_ten", "PGD", "So_DGD", "So_ap", "So_KH", "So_mon_vay",
-        "Tong_du_no", "Du_no_trong_han", "Du_no_qh", "TL_QH_pct",
+        "Tong_du_no", "Du_no_trong_han", "Du_no_qh", "Du_no_khoanh", "TL_QH_pct",
         "Cho_vay_thang", "Thu_no_thang", "Cho_vay_nam", "Thu_no_nam",
         "No_den_han_mon", "No_den_han_goc", "So_mon_3m_khd", "So_mon_rui_ro",
         "So_KH_moi_thang", "So_giai_ngan_thang", "Canh_bao",
@@ -826,6 +732,7 @@ def tong_hop_hstd_theo_cbtd(
             tong_du_no = _sum_col(df_cb, COT_TONG_DU_NO)
             du_no_qh = _sum_col(df_cb, COT_DU_NO_QH)
             du_no_th = _sum_col(df_cb, COT_DU_NO_TH)
+            du_no_khoanh = _sum_col(df_cb, COT_DU_NO_KHOANH)
             so_kh = _nunique_nonempty(df_cb, COT_MA_KH)
             so_mon = _nunique_nonempty(df_cb, COT_SO_KU)
             tl_qh = round(du_no_qh / tong_du_no * 100, 2) if tong_du_no > 0 else 0.0
@@ -916,6 +823,7 @@ def tong_hop_hstd_theo_cbtd(
                 "Tong_du_no": tong_du_no,
                 "Du_no_trong_han": du_no_th,
                 "Du_no_qh": du_no_qh,
+                "Du_no_khoanh": du_no_khoanh,
                 "TL_QH_pct": tl_qh,
                 "Cho_vay_thang": cho_vay_thang,
                 "Thu_no_thang": thu_no_thang,

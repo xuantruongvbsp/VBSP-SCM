@@ -67,17 +67,18 @@ def _get_tab(name: str):
 
 
 def _render_cbtd_dia_ban(tab_parent=None, **kw):
-    """Nhóm CBTD & Địa bàn — 4 sub-tab: Dashboard · CBTD · ĐGD · Tổ TK&VV."""
+    """Nhóm CBTD & Địa bàn — 5 sub-tab: Dashboard · CBTD · NOXH · ĐGD · Tổ TK&VV."""
     if tab_parent is not None:
         ctx = tab_parent
     else:
         ctx = st.container()
     with ctx:
         lazy_tabs(
-            ["📊 Dashboard", "👔 Cán bộ tín dụng", "📍 Điểm Giao Dịch", "🏘️ Tổ TK&VV"],
+            ["📊 Dashboard", "👔 Cán bộ tín dụng", "🏠 Giao quản lý NOXH trực tiếp", "📍 Điểm Giao Dịch", "🏘️ Tổ TK&VV"],
             [
                 lambda c: _get_tab("tab_cbtd_dashboard").render(c, **kw),
                 lambda c: _get_tab("tab_cbtd").render(c, **kw),
+                lambda c: _get_tab("tab_vay_noxh").render(c, **kw),
                 lambda c: _get_tab("tab_quan_ly_dgd").render(c, **kw),
                 lambda c: _get_tab("tab_cdtotkvv").render(c, **dict(kw, cdto_mode="cn")),
             ],

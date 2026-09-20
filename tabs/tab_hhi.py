@@ -398,7 +398,7 @@ def _bang_theo_nv(
 def _ten_don_vi_ngan(value) -> str:
     text = _text_sach(value)
     if text == DON_VI_CHI_NHANH:
-        return "Hội sở tỉnh"
+        return "Hội sở thành phố"
     if text.startswith("PGD "):
         return text[4:].strip()
     return text

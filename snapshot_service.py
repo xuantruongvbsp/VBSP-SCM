@@ -14,6 +14,7 @@ API:
 from __future__ import annotations
 
 import calendar
+import re
 from datetime import datetime
 
 import pandas as pd
@@ -30,6 +31,8 @@ from services.upload_service import KetQuaUpload
 from config import (
     COT_MA_CHUONG_TRINH,
     COT_MA_KH,
+    COT_MA_PGD,
+    COT_MA_TO,
     COT_NGAY_SL,
     COT_NGUON_VON,
     COT_SO_KU,
@@ -110,14 +113,19 @@ def ngay_cuoi_thang(ky: str) -> str | None:
         return None
 
 
-def snapshot_la_cuoi_thang(df_snapshot: pd.DataFrame, ky: str) -> bool:
-    """Kiểm tra mọi dòng snapshot có ngày số liệu đúng ngày cuối ``ky``."""
+def snapshot_la_cuoi_thang(
+    df_snapshot: pd.DataFrame,
+    ky: str,
+    *,
+    cot_ngay: str = "ngay_so_lieu",
+) -> bool:
+    """Kiểm tra mọi dòng snapshot có ngày ở ``cot_ngay`` đúng cuối ``ky``."""
     expected = ngay_cuoi_thang(ky)
     if not expected or df_snapshot is None or df_snapshot.empty:
         return False
-    if "ngay_so_lieu" not in df_snapshot.columns:
+    if cot_ngay not in df_snapshot.columns:
         return False
-    dates = _parse_date_series(df_snapshot["ngay_so_lieu"])
+    dates = _parse_date_series(df_snapshot[cot_ngay])
     if dates.empty or dates.isna().any():
         return False
     return bool(dates.dt.strftime("%d/%m/%Y").eq(expected).all())
@@ -316,10 +324,10 @@ def danh_sach_ky() -> list[str]:
 
 
 def ky_baseline(ds_ky: list[str], ky_hien_tai: str | None = None) -> str | None:
-    """Kỳ baseline: YYYY-12 năm trước của ky_hien_tai.
+    """Trả đúng kỳ ``YYYY-12`` năm trước; thiếu kỳ thì trả ``None``.
 
-    Ưu tiên: (1) kỳ YYYY-12 chính xác, (2) kỳ gần nhất ≤ mốc, (3) kỳ cũ nhất.
-    ds_ky phải được sort giảm dần (mới → cũ) như danh_sach_ky() trả về.
+    Không thay mốc 31/12 bằng một snapshot tháng khác vì các call-site dùng hàm
+    này để gắn nhãn baseline năm. ``ds_ky`` có thể ở bất kỳ thứ tự nào.
     """
     if not ds_ky:
         return None
@@ -328,14 +336,9 @@ def ky_baseline(ds_ky: list[str], ky_hien_tai: str | None = None) -> str | None:
     try:
         nam = int(str(ky_hien_tai).split("-")[0])
     except (ValueError, IndexError):
-        return ds_ky[-1]
+        return None
     moc = f"{nam - 1}-12"
-    if moc in ds_ky:
-        return moc
-    for ky in ds_ky:          # ds_ky sorted DESC → dừng tại kỳ đầu tiên ≤ mốc
-        if ky <= moc:
-            return ky
-    return ds_ky[-1]           # fallback: kỳ cũ nhất
+    return moc if moc in ds_ky else None
 
 
 def ky_thang_truoc(ds_ky: list[str], ky_hien_tai: str | None = None) -> str | None:
@@ -532,18 +535,73 @@ def _tong_hop_uy_thac_snapshot(
     return rows
 
 
+_DVUT_CODE_TO_NAME = {
+    "11": "Hội nông dân",
+    "12": "Hội liên hiệp phụ nữ",
+    "13": "Hội cựu chiến binh",
+    "14": "Đoàn thanh niên",
+}
+
+
+def _bo_sung_uy_thac_tu_ma_to(df: pd.DataFrame) -> pd.DataFrame:
+    """Bù tên Hội/Tổ từ CDTOTKVV khi BCQUERY để trống các cột tên."""
+    if df is None or df.empty or COT_MA_TO not in df.columns:
+        return df
+
+    current_dvut = (
+        df[COT_DVUT].astype("string").str.strip().replace("", pd.NA)
+        if COT_DVUT in df.columns
+        else pd.Series(pd.NA, index=df.index, dtype="string")
+    )
+    if bool(current_dvut.notna().all()):
+        return df
+
+    try:
+        from data.cdtotkvv import ban_do_ma_to_dvut, chuan_hoa_ma_to_key
+
+        map_dvut = ban_do_ma_to_dvut()
+    except Exception as e:
+        logger.warning("_bo_sung_uy_thac_tu_ma_to: không đọc được map CDTOTKVV — %s", e)
+        return df
+    if not map_dvut:
+        return df
+
+    out = df.copy()
+    ma_to_key = out[COT_MA_TO].map(chuan_hoa_ma_to_key)
+    dvut_code = ma_to_key.map(map_dvut)
+    if COT_MA_PGD in out.columns:
+        ma_pgd_key = out[COT_MA_PGD].map(chuan_hoa_ma_to_key)
+        key_kep = ma_pgd_key + "|" + ma_to_key
+        dvut_code = key_kep.map(map_dvut).fillna(dvut_code)
+
+    dvut_suy_ra = dvut_code.astype("string").str.strip().replace("", pd.NA)
+    dvut_suy_ra = dvut_suy_ra.map(lambda value: _DVUT_CODE_TO_NAME.get(str(value), value))
+    out[COT_DVUT] = current_dvut.where(current_dvut.notna(), dvut_suy_ra)
+
+    current_to = (
+        out[COT_TEN_TO].astype("string").str.strip().replace("", pd.NA)
+        if COT_TEN_TO in out.columns
+        else pd.Series(pd.NA, index=out.index, dtype="string")
+    )
+    ten_to_suy_ra = ma_to_key.where(dvut_suy_ra.notna()).map(
+        lambda value: f"Tổ {value}" if value else pd.NA
+    )
+    out[COT_TEN_TO] = current_to.where(current_to.notna(), ten_to_suy_ra)
+    return out
+
+
 def luu_uy_thac_snapshot(
     df_full: pd.DataFrame,
     username: str,
     ky: str | None = None,
 ) -> KetQuaUpload:
-    """Lưu snapshot ủy thác theo cấp CN/PGD/XA/HOI/TO, upsert-safe."""
+    """Lưu snapshot ủy thác theo cấp CN/PGD/XA/HOI/TO, thay trọn kỳ."""
     if df_full is None or df_full.empty or COT_DVUT not in df_full.columns:
         return KetQuaUpload(False, "Không có dữ liệu ĐVUT để tạo snapshot ủy thác.")
     ky_str = str(ky or "").strip() or _ky_tu_df(df_full)
     ngay_sl = _ngay_so_lieu_max(df_full)
 
-    df = df_full.copy()
+    df = _bo_sung_uy_thac_tu_ma_to(df_full.copy())
     df[COT_DVUT] = df[COT_DVUT].astype("string").str.strip().replace("", pd.NA)
     df = df[df[COT_DVUT].notna()].copy()
     if df.empty:
@@ -576,9 +634,14 @@ def luu_uy_thac_snapshot(
              VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"""
     try:
         with db.get_conn() as conn:
-            conn.executemany(sql, [(ky_str, *row, ngay_sl, username) for row in rows])
-            conn.commit()
-        db.ghi_audit(username, "luu_uy_thac_snapshot", f"Kỳ {ky_str} — {len(rows)} dòng")
+            try:
+                conn.execute("DELETE FROM uy_thac_snapshot WHERE ky=?", (ky_str,))
+                conn.executemany(sql, [(ky_str, *row, ngay_sl, username) for row in rows])
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+        db.ghi_audit(username, "luu_uy_thac_snapshot", f"Kỳ {ky_str} — thay thế {len(rows)} dòng")
         _clear_snapshot_cache()
         return KetQuaUpload(True, f"✅ Đã lưu snapshot ủy thác kỳ **{ky_str}** ({len(rows)} dòng)")
     except Exception as e:
@@ -1054,8 +1117,8 @@ def danh_sach_ky_gqvl() -> list[str]:
 
 def luu_cdtotkvv_snapshot(df_cdtotkvv: pd.DataFrame, ky: str, username: str) -> KetQuaUpload:
     """Tổng hợp df_cdtotkvv (CDTOTKVV toàn CN) → lưu vào cdtotkvv_snapshot.
-    ky: 'YYYY-MM' — thường lấy cùng kỳ với HSTD snapshot.
-    INSERT OR REPLACE — chạy lại cùng kỳ sẽ ghi đè.
+    ky: 'YYYY-MM' — phải là kỳ của chính dữ liệu CDTOTKVV.
+    Chạy lại cùng kỳ sẽ thay trọn kỳ để không giữ dòng đơn vị đã biến mất.
     Lưu 2 loại: tổng theo PGD + tổng CN ('__CN__').
     """
     if df_cdtotkvv is None or df_cdtotkvv.empty:
@@ -1130,9 +1193,10 @@ def luu_cdtotkvv_snapshot(df_cdtotkvv: pd.DataFrame, ky: str, username: str) -> 
     so_dong = 0
     try:
         with db.get_conn() as conn:
+            conn.execute("DELETE FROM cdtotkvv_snapshot WHERE ky=?", (ky,))
             for (pgd, so_to, so_tot, so_kha, so_tb, so_yeu, diem_tb) in rows:
                 conn.execute(
-                    """INSERT OR REPLACE INTO cdtotkvv_snapshot
+                    """INSERT INTO cdtotkvv_snapshot
                        (ky, ten_pgd, so_to, so_tot, so_kha, so_tb, so_yeu, diem_tb, created_by)
                        VALUES (?,?,?,?,?,?,?,?,?)""",
                     (ky, pgd, so_to, so_tot, so_kha, so_tb, so_yeu, diem_tb, username),
@@ -1268,6 +1332,41 @@ def danh_sach_ky_cdtotkvv() -> list[str]:
     except Exception as e:
         logger.error("danh_sach_ky_cdtotkvv: %s", e, exc_info=True)
         return []
+
+
+def xoa_cdtotkvv_snapshot_ky(ky: str, username: str) -> KetQuaUpload:
+    """Xóa riêng snapshot CDTOTKVV và CBTD–Tổ của một kỳ bị gắn sai.
+
+    Không đụng các bảng HSTD/Thôn/Ủy thác/NQ11/GQVL cùng kỳ.
+    """
+    ky_str = str(ky or "").strip()
+    if not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", ky_str):
+        return KetQuaUpload(False, f"Kỳ snapshot không hợp lệ: {ky_str!r}.")
+    try:
+        with db.get_conn() as conn:
+            so_cdto = conn.execute(
+                "SELECT COUNT(*) FROM cdtotkvv_snapshot WHERE ky=?", (ky_str,)
+            ).fetchone()[0]
+            so_cbtd = conn.execute(
+                "SELECT COUNT(*) FROM cbtd_to_tkvv_snapshot WHERE ky=?", (ky_str,)
+            ).fetchone()[0]
+            conn.execute("DELETE FROM cdtotkvv_snapshot WHERE ky=?", (ky_str,))
+            conn.execute("DELETE FROM cbtd_to_tkvv_snapshot WHERE ky=?", (ky_str,))
+            conn.commit()
+        db.ghi_audit(
+            username,
+            "xoa_cdtotkvv_snapshot_ky",
+            f"Kỳ {ky_str} — CDTOTKVV {so_cdto} dòng, CBTD–Tổ {so_cbtd} dòng",
+        )
+        _clear_snapshot_cache()
+        return KetQuaUpload(
+            True,
+            f"✅ Đã xóa snapshot CDTOTKVV kỳ **{ky_str}** "
+            f"({so_cdto} dòng CDTOTKVV, {so_cbtd} dòng CBTD–Tổ).",
+        )
+    except Exception as e:
+        logger.error("xoa_cdtotkvv_snapshot_ky: lỗi kỳ %s — %s", ky_str, e, exc_info=True)
+        return KetQuaUpload(False, f"❌ Không xóa được snapshot CDTOTKVV kỳ {ky_str}: {e}")
 
 
 def compare_snapshot_2_ky(ky1: str, ky2: str, table: str = "hstd") -> pd.DataFrame:

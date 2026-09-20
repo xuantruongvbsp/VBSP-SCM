@@ -146,6 +146,40 @@ def test_snapshot_cdto_phong_ve_loai_du_no_0_va_dem_yeu_kem():
     assert row == (2, 1, 0, 1)
 
 
+def test_snapshot_cdto_chay_lai_thay_tron_ky_khong_giu_don_vi_cu():
+    conn = sqlite3.connect(":memory:")
+    conn.execute(
+        """CREATE TABLE cdtotkvv_snapshot (
+            ky TEXT NOT NULL, ten_pgd TEXT NOT NULL, so_to INTEGER,
+            so_tot INTEGER, so_kha INTEGER, so_tb INTEGER, so_yeu INTEGER,
+            diem_tb REAL, created_by TEXT, UNIQUE(ky, ten_pgd)
+        )"""
+    )
+    cm = MagicMock()
+    cm.__enter__ = MagicMock(return_value=conn)
+    cm.__exit__ = MagicMock(return_value=False)
+    df_cu = pd.DataFrame({
+        "ma_dv": ["001", "002"], "ten_dv": ["PGD A", "PGD B"],
+        "stt": [1, 1], "du_no": [100, 100], "tong_diem": [90, 80],
+        "xep_loai": ["Tốt", "Khá"],
+    })
+    df_moi = df_cu.iloc[[0]].copy()
+
+    with patch("snapshot_service.db.get_conn", return_value=cm), patch(
+        "snapshot_service.db.ghi_audit", return_value=None
+    ):
+        snapshot_service.luu_cdtotkvv_snapshot(df_cu, "2026-06", "u1")
+        result = snapshot_service.luu_cdtotkvv_snapshot(df_moi, "2026-06", "u2")
+
+    rows = conn.execute(
+        "SELECT ten_pgd FROM cdtotkvv_snapshot WHERE ky='2026-06' ORDER BY ten_pgd"
+    ).fetchall()
+    conn.close()
+
+    assert result.thanh_cong is True
+    assert rows == [("PGD A",), ("__CN__",)]
+
+
 def test_doi_chieu_hstd_theo_ma_to_loai_ma_0_va_hien_to_thieu_cdto():
     df_cdto = pd.DataFrame(
         {

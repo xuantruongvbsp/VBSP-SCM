@@ -1,6 +1,7 @@
 """Upload NQ11 / GQVL / CDTOTKVV toàn Chi nhánh."""
 from __future__ import annotations
 
+import hashlib
 from io import BytesIO
 
 import pandas as pd
@@ -184,7 +185,7 @@ def render_cdto_toan_cn(username: str) -> None:
             from services.upload_service import xu_ly_cdto_toan_cn
             status.write(f"Đang tách và lưu **{preview['so_dv']}** file đơn vị.")
             try:
-                ket_qua = xu_ly_cdto_toan_cn(file_bytes)
+                ket_qua = xu_ly_cdto_toan_cn(file_bytes, username=username)
             except Exception as e:
                 logger.error("render_cdto_toan_cn: lỗi upload — %s", e, exc_info=True)
                 status.update(label="❌ Upload CDTOTKVV toàn CN thất bại.", state="error", expanded=False)
@@ -195,6 +196,10 @@ def render_cdto_toan_cn(username: str) -> None:
                 status.update(label="❌ Upload CDTOTKVV toàn CN thất bại.", state="error", expanded=False)
                 st.error(ket_qua["_loi_doc"].thong_bao)
                 return
+
+            ket_qua_snapshot = ket_qua.pop("_snapshot", None)
+            if ket_qua_snapshot is not None:
+                status.write(ket_qua_snapshot.thong_bao)
 
             status.write("Đã lưu file đơn vị, đang ghi audit upload.")
             for ten_pgd, kq in ket_qua.items():
@@ -295,12 +300,155 @@ def render_nq11_toan_cn(username: str) -> None:
         st.rerun()
 
 
+def render_hstd_toan_cn(username: str) -> None:
+    """Upload 1 file HSTD tổng hợp toàn CN → tự tách theo cột 'Tên PGD' và lưu 22 PGD."""
+    st.info(
+        "Upload 1 file HSTD tổng hợp của toàn CN — hệ thống dùng cột **Tên PGD** "
+        "để tự động tách và lưu cho từng PGD (không cần upload 22 lần riêng lẻ)."
+    )
+
+    _SS_BYTES   = "hstd_cn_bytes"
+    _SS_PREVIEW = "hstd_cn_preview"
+    _SS_FILE_ID = "hstd_cn_file_id"
+    _ver = st.session_state.setdefault("hstd_cn_ver", 0)
+
+    uploaded = st.file_uploader(
+        "Chọn file HSTD toàn CN",
+        type=["xlsx"],
+        key=f"hstd_cn_uploader_{_ver}",
+        label_visibility="collapsed",
+    )
+
+    if uploaded is not None:
+        uploaded_bytes = uploaded.getvalue()
+        file_id = (uploaded.name, uploaded.size, hashlib.sha256(uploaded_bytes).hexdigest())
+        if st.session_state.get(_SS_FILE_ID) != file_id:
+            st.session_state[_SS_FILE_ID] = file_id
+            st.session_state[_SS_BYTES]   = uploaded_bytes
+            st.session_state.pop(_SS_PREVIEW, None)
+
+    if _SS_BYTES not in st.session_state:
+        return
+
+    file_bytes: bytes = st.session_state[_SS_BYTES]
+
+    if _SS_PREVIEW not in st.session_state:
+        with st.spinner("🔍 Đang phân tích file HSTD & tách theo PGD..."):
+            try:
+                from services.upload_service import tach_file_hstd_toan_cn
+                pgd_map = tach_file_hstd_toan_cn(file_bytes)
+            except ValueError as e:
+                st.error(f"❌ {e}")
+                return
+            except Exception as e:
+                logger.error("render_hstd_toan_cn: lỗi phân tích — %s", e, exc_info=True)
+                st.error(f"❌ Lỗi phân tích file: {e}")
+                return
+
+            ds_tat_ca = [DON_VI_CHI_NHANH] + DS_PGD
+            thieu = [dv for dv in ds_tat_ca if dv not in pgd_map]
+
+            preview_rows = []
+            for ten_pgd in ds_tat_ca:
+                if ten_pgd in pgd_map:
+                    try:
+                        df_tmp = pd.read_excel(BytesIO(pgd_map[ten_pgd]), engine="openpyxl", header=4)
+                        so_dong = len(df_tmp)
+                    except Exception:
+                        so_dong = "?"
+                else:
+                    so_dong = 0
+                da_co = kiem_tra_file_ton_tai_pgd(ten_pgd, "hstd")
+                preview_rows.append({
+                    "Đơn vị": ten_pgd,
+                    "Số dòng": so_dong,
+                    "Hiện tại": "🔄 Cập nhật" if da_co else ("—" if so_dong == 0 else "🆕 Mới"),
+                    "Trạng thái": "✅ Sẵn sàng" if ten_pgd in pgd_map else "⚠️ Thiếu trong file",
+                })
+
+            st.session_state[_SS_PREVIEW] = {
+                "rows": preview_rows, "thieu": thieu,
+                "so_dv": len(pgd_map),
+            }
+
+    preview = st.session_state.get(_SS_PREVIEW)
+    if not preview:
+        return
+
+    c1, c2 = st.columns(2)
+    c1.metric("Số đơn vị có HSTD", preview["so_dv"])
+    c2.metric("Tổng số đơn vị CN", len([DON_VI_CHI_NHANH] + DS_PGD))
+
+    tong_don_vi = len([DON_VI_CHI_NHANH] + DS_PGD)
+    du_22_don_vi = not preview["thieu"] and preview["so_dv"] == tong_don_vi
+    if preview["thieu"]:
+        st.error(
+            f"⚠️ **{len(preview['thieu'])}** đơn vị không có dữ liệu HSTD: "
+            + ", ".join(preview["thieu"])
+            + ". Hệ thống chưa cho phép ghi để tránh trộn dữ liệu mới và dữ liệu cũ."
+        )
+
+    def _style_ht(v: str) -> str:
+        if v.startswith("🆕"):
+            return "background-color:#d4edda;color:#155724;font-weight:bold"
+        if v.startswith("🔄"):
+            return "background-color:#fff3cd;color:#856404"
+        return ""
+
+    df_prev = pd.DataFrame(preview["rows"])
+    st.dataframe(
+        df_prev.style.map(_style_ht, subset=["Hiện tại"]),
+        use_container_width=True, hide_index=True,
+        height=min(600, 60 + len(preview["rows"]) * 35),
+    )
+
+    if st.button(
+        f"📤 Upload {preview['so_dv']} đơn vị → hàng chờ",
+        type="primary",
+        key="btn_hstd_cn_upload",
+        disabled=not du_22_don_vi,
+    ):
+        with st.spinner("⏳ Đang tách và lưu từng PGD..."):
+            from services.upload_service import xu_ly_hstd_toan_cn
+            ket_qua = xu_ly_hstd_toan_cn(file_bytes, username=username)
+
+        if "_loi_doc" in ket_qua:
+            st.error(ket_qua["_loi_doc"].thong_bao)
+            return
+
+        for ten_pgd, kq in ket_qua.items():
+            if kq.thanh_cong:
+                db.ghi_audit(username, "upload_hstd_toan_cn", f"HSTD toàn CN — {ten_pgd}")
+
+        so_ok = sum(1 for v in ket_qua.values() if v.thanh_cong)
+        if so_ok != tong_don_vi:
+            st.error(
+                f"❌ Chỉ lưu được {so_ok}/{tong_don_vi} đơn vị; "
+                "không đưa HSTD vào hàng chờ merge."
+            )
+            return
+
+        st.success(f"✅ Đã lưu đủ **{so_ok}/{tong_don_vi}** đơn vị thành công")
+        them_vao_hang_cho("hstd")
+        st.info("⏳ Chuyển sang tab **📊 Tổng quan** → bấm **🔄 Merge toàn CN**.")
+        for ten_pgd, kq in ket_qua.items():
+            if not kq.thanh_cong:
+                st.warning(f"⚠️ {ten_pgd}: {kq.thong_bao}")
+
+        st.cache_data.clear()
+        for _k in (_SS_PREVIEW, _SS_BYTES, _SS_FILE_ID):
+            st.session_state.pop(_k, None)
+        xoa_cache_trang_thai()
+        st.session_state["hstd_cn_ver"] = _ver + 1
+        st.rerun()
+
+
 def render_gqvl_toan_cn(username: str, df_hstd=None) -> None:
     """Upload 1 file GQVL tổng hợp toàn CN → tự tách và lưu 22 PGD."""
     st.info(
         "Upload 1 file GQVL tổng hợp của toàn CN — hệ thống dùng **Số khế ước** "
         "đối chiếu với HSTD để tự động phân bổ về từng PGD.  \n"
-        "Số KU không khớp với HSTD sẽ được gán về **Hội sở Chi nhánh tỉnh**."
+        "Số KU không khớp với HSTD sẽ được gán về **Hội sở Chi nhánh thành phố**."
     )
 
     if df_hstd is None or df_hstd.empty:

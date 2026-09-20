@@ -384,6 +384,7 @@ def gan_cbtd_vao_df(
     col_thon: str = "Tên thôn",
     col_ma_thon: str = "Mã thôn",
     col_pgd: str = "Tên PGD",
+    fallback_xa_dgd: bool = False,
 ):
     """Thêm cột 'CBTD' (mã) và 'Tên CBTD' vào df.
 
@@ -435,6 +436,51 @@ def gan_cbtd_vao_df(
         con_thieu = df["CBTD"].isna()
         df.loc[con_thieu, "CBTD"] = join_key[con_thieu].map(str_map_cb)
         df.loc[con_thieu, "Tên CBTD"] = join_key[con_thieu].map(str_map_ten)
+
+    # Fallback riêng cho snapshot lịch sử trước/sau sáp nhập: nhiều dòng kỳ cũ
+    # còn mã thôn cũ hoặc tên thôn trống, nhưng tên xã cũ trùng chính xác tên ĐGD.
+    if fallback_xa_dgd and col_pgd in df.columns and col_xa in df.columns:
+        con_thieu = df["CBTD"].isna()
+        if con_thieu.any():
+            owner_by_dgd: dict[tuple[str, str], tuple[str, str] | None] = {}
+            for ma_cb, info in (cbtd_data or {}).items():
+                pgd_key = _normalize_cbtd_join_text((info or {}).get("pgd", ""))
+                ten_cb = (info or {}).get("ho_ten", "")
+                if not pgd_key:
+                    continue
+                for dgd_name in (info or {}).get("ds_dgd", []) or []:
+                    dgd_key = _normalize_cbtd_join_text(dgd_name)
+                    if not dgd_key:
+                        continue
+                    key = (pgd_key, dgd_key)
+                    value = (ma_cb, ten_cb)
+                    if key in owner_by_dgd and owner_by_dgd[key] != value:
+                        owner_by_dgd[key] = None
+                    else:
+                        owner_by_dgd[key] = value
+
+            xa_fallback_cb: dict[str, str] = {}
+            xa_fallback_ten: dict[str, str] = {}
+            for pgd_k, xa_block in (dgd_map or {}).items():
+                pgd_key = _normalize_cbtd_join_text(pgd_k)
+                if not pgd_key or not isinstance(xa_block, dict):
+                    continue
+                for xa_name, dgd_block in xa_block.items():
+                    xa_key = _normalize_cbtd_join_text(xa_name)
+                    if not xa_key or not isinstance(dgd_block, dict):
+                        continue
+                    owner = owner_by_dgd.get((pgd_key, xa_key))
+                    if owner is None:
+                        continue
+                    if owner and xa_key in {_normalize_cbtd_join_text(x) for x in dgd_block.keys()}:
+                        join = f"{pgd_key}\x1f{xa_key}"
+                        xa_fallback_cb[join] = owner[0]
+                        xa_fallback_ten[join] = owner[1]
+
+            if xa_fallback_cb:
+                join_key = _normalize_cbtd_join_series(df[col_pgd]) + "\x1f" + _normalize_cbtd_join_series(df[col_xa])
+                df.loc[con_thieu, "CBTD"] = join_key[con_thieu].map(xa_fallback_cb)
+                df.loc[con_thieu, "Tên CBTD"] = join_key[con_thieu].map(xa_fallback_ten)
     return df
 
 

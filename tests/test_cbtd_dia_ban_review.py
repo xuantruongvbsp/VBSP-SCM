@@ -17,6 +17,7 @@ from config import (
     COT_GOC_DEN_HAN_LK,
     COT_MA_KH,
     COT_MA_THON,
+    COT_MA_CHUONG_TRINH,
     COT_NGAY_SL,
     COT_SO_KU,
     COT_TEN_CT,
@@ -34,6 +35,8 @@ from config import (
 from data.khtd import gan_cbtd_vao_df
 from services.cbtd_dia_ban_service import (
     _normalize,
+    chuan_bi_hstd_bao_cao_dgd,
+    tom_tat_kpi,
     tong_hop_hstd_cbtd_xa_chuong_trinh,
     tong_hop_hstd_theo_cbtd,
     tong_hop_hstd_theo_thon,
@@ -44,6 +47,7 @@ from tabs.tab_quan_ly_dgd import (
     _gop_dgd_thon_tu_excel_df,
     _validate_trung_thon_toan_xa,
 )
+from tabs.tab_cbtd import _tao_bang_tong_hop
 
 
 def test_cbtd_service_normalize_guard_none_nan_pdna():
@@ -51,6 +55,22 @@ def test_cbtd_service_normalize_guard_none_nan_pdna():
     assert _normalize(float("nan")) == ""
     assert _normalize(pd.NA) == ""
     assert _normalize("  Xã A  ") == "xã a"
+
+
+def test_tom_tat_kpi_dem_unique_va_chuan_hoa_xep_loai():
+    df_cdto = pd.DataFrame({
+        "ten_dv": ["PGD A", "PGD A", "PGD A", "PGD A"],
+        "ten_xa": ["Xã A", "Xã A", "Xã A", "Xã B"],
+        "ma_to": ["T01", "T01", "T02", "T03"],
+        "tong_diem": [90, 95, 82, 55],
+        "xep_loai": [" tốt ", "Tốt", "KHÁ", " trung bình "],
+    })
+
+    kpi = tom_tat_kpi({}, {}, df_cdto)
+
+    assert kpi["so_to_tong"] == 3
+    assert kpi["so_to_tb_yeu"] == 1
+    assert kpi["pct_to_dat"] == 66.7
 
 
 def test_gan_cbtd_vao_df_join_key_normalize_dong_nhat_pdna():
@@ -145,6 +165,8 @@ def test_tong_hop_hstd_theo_cbtd_cong_so_lieu_tung_can_bo():
         COT_TEN_CT: ["CT A", "CT B", "CT A"],
         COT_NGAY_VAY: ["2026-09-01", "2026-08-15", "2026-09-02"],
         COT_NGAY_GN_DAU_TIEN: ["2026-09-01", None, "2026-09-03"],
+        COT_NGAY_DEN_HAN: ["2026-09-20", "2026-08-15", "2026-09-25"],
+        COT_GOC_DEN_HAN_LK: [10_000_000, 20_000_000, 30_000_000],
     })
 
     out = tong_hop_hstd_theo_cbtd(cbtd_data, dgd_map, df_hstd, yyyy=2026, mm=9)
@@ -159,7 +181,8 @@ def test_tong_hop_hstd_theo_cbtd_cong_so_lieu_tung_can_bo():
     assert cb01["TL_QH_pct"] == 20.0
     assert cb01["Cho_vay_thang"] == 0
     assert cb01["Thu_no_thang"] == 0
-    assert cb01["No_den_han_mon"] == 0
+    assert cb01["No_den_han_mon"] == 1
+    assert cb01["No_den_han_goc"] == 10_000_000
     assert cb01["So_mon_3m_khd"] == 0
     assert cb01["So_mon_rui_ro"] == 2
     assert cb01["So_KH_moi_thang"] == 1
@@ -201,6 +224,7 @@ def test_tong_hop_hstd_cbtd_xa_chuong_trinh_giong_mau_rpt():
         COT_CHUYEN_QH_TRONG_THANG: [4_000_000, 0, 0],
         COT_CQH_NAM: [6_000_000, 0, 0],
         COT_HINH_THUC_VAY: [2, 2, 1],
+        COT_MA_CHUONG_TRINH: [3, 3, 12],
     })
 
     out = tong_hop_hstd_cbtd_xa_chuong_trinh(cbtd_data, dgd_map, df_hstd)
@@ -221,6 +245,31 @@ def test_tong_hop_hstd_cbtd_xa_chuong_trinh_giong_mau_rpt():
     assert row["QH tăng/giảm tháng (triệu)"] == 2
     assert row["QH tăng/giảm năm (triệu)"] == 3
     assert row["Tỷ lệ QH %"] == 10.0
+
+
+def test_chuan_bi_hstd_bao_cao_dgd_khu_trung_va_chi_loai_noxh_truc_tiep():
+    df = pd.DataFrame({
+        COT_MA_KH: ["KH01", "KH01", "KH02", "KH03", "KH04", "KH05"],
+        COT_SO_KU: ["KU01", "KU01", "KU02", "KU03", "", "KU05"],
+        COT_TEN_CT: [
+            "Cho vay giải quyết việc làm",
+            "Cho vay giải quyết việc làm",
+            "Cho vay nhà ở xã hội theo Nghị định số 100",
+            "Cho vay giải quyết việc làm",
+            "Cho vay giải quyết việc làm",
+            "Cho vay giải quyết việc làm",
+        ],
+        COT_MA_CHUONG_TRINH: [3, 3, 12, 3, 3, 3],
+        COT_HINH_THUC_VAY: [3, 3, 1, 1, 3, 3],
+        COT_TONG_DU_NO: [100_000_000, 100_000_000, 700_000_000, 15_000_000, 50_000_000, 0],
+        COT_DU_NO_QH: [0, 0, 0, 0, 0, 0],
+        COT_DU_NO_KHOANH: [0, 0, 0, 0, 0, 0],
+    })
+
+    out = chuan_bi_hstd_bao_cao_dgd(df)
+
+    assert list(out[COT_SO_KU]) == ["KU01", "KU03"]
+    assert int(out[COT_TONG_DU_NO].sum()) == 115_000_000
 
 
 def test_tong_hop_hstd_theo_thon_va_gan_lai_cbtd():
@@ -319,3 +368,118 @@ def test_snapshot_thon_cu_thieu_pgd_chi_gan_khi_key_duy_nhat():
     out = tong_hop_thon_snapshot_theo_cbtd(legacy, cbtd_data, dgd_map)
 
     assert out.empty
+
+
+def test_snapshot_thon_cu_ma_thon_cu_fallback_theo_xa_trung_ten_dgd():
+    cbtd_data = {
+        "CB01": {"ho_ten": "A", "pgd": "Hội sở Chi nhánh tỉnh", "ds_dgd": ["Phước Tân"]},
+        "CB02": {"ho_ten": "B", "pgd": "Hội sở Chi nhánh tỉnh", "ds_dgd": ["Trảng Dài"]},
+    }
+    dgd_map = {
+        "Hội sở Chi nhánh tỉnh": {
+            "Phước Tân": {"Phước Tân": {"thon": ["Khu phố Tân Cang"], "ma_thon": ["46005603"]}},
+            "Trảng Dài": {"Trảng Dài": {"thon": ["Khu phố 1"], "ma_thon": ["46006608"]}},
+        }
+    }
+    legacy = pd.DataFrame({
+        "ten_pgd": ["Hội sở Chi nhánh tỉnh", "Hội sở Chi nhánh tỉnh"],
+        "ma_thon": ["46005605", "46006603"],
+        "ten_xa": ["Phước Tân", "Trảng Dài"],
+        "ten_thon": ["", ""],
+        "tong_du_no": [10_000_000, 20_000_000],
+    })
+
+    out = tong_hop_thon_snapshot_theo_cbtd(legacy, cbtd_data, dgd_map)
+
+    by_cb = dict(zip(out["ma_cb"], out["tong_du_no"]))
+    assert by_cb == {"CB01": 10_000_000, "CB02": 20_000_000}
+
+
+def test_snapshot_thon_cu_khong_fallback_khi_dgd_thuoc_nhieu_cbtd():
+    cbtd_data = {
+        "CB01": {"ho_ten": "A", "pgd": "PGD A", "ds_dgd": ["Xã A"]},
+        "CB02": {"ho_ten": "B", "pgd": "PGD A", "ds_dgd": ["Xã A"]},
+    }
+    dgd_map = {
+        "PGD A": {
+            "Xã A": {"Xã A": {"thon": ["Thôn mới"], "ma_thon": ["999"]}},
+        }
+    }
+    legacy = pd.DataFrame({
+        "ten_pgd": ["PGD A"],
+        "ma_thon": ["101"],
+        "ten_xa": ["Xã A"],
+        "ten_thon": [""],
+        "tong_du_no": [10_000_000],
+    })
+
+    out = tong_hop_thon_snapshot_theo_cbtd(legacy, cbtd_data, dgd_map)
+
+    assert out.empty
+
+
+def test_fallback_snapshot_ap_dung_cho_delta_thang_truoc_va_3112():
+    cbtd_data = {
+        "CB01": {"ho_ten": "A", "pgd": "PGD A", "ds_dgd": ["Xã A"]},
+    }
+    dgd_map = {
+        "PGD A": {
+            "Xã A": {"Xã A": {"thon": ["Thôn mới"], "ma_thon": ["999"]}},
+        }
+    }
+
+    def _snapshot_cu(du_no: int) -> pd.DataFrame:
+        legacy = pd.DataFrame({
+            "ten_pgd": ["PGD A"],
+            "ma_thon": ["101"],
+            "ten_xa": ["Xã A"],
+            "ten_thon": [""],
+            "tong_du_no": [du_no],
+            "du_no_qh": [0],
+        })
+        return tong_hop_thon_snapshot_theo_cbtd(
+            legacy, cbtd_data, dgd_map
+        ).rename(columns={
+            "ma_cb": "Ma_CBTD",
+            "tong_du_no": "Tong_du_no",
+            "du_no_qh": "Du_no_qh",
+        })
+
+    hien_tai = pd.DataFrame({
+        "Ma_CBTD": ["CB01"],
+        "Ho_ten": ["A"],
+        "PGD": ["PGD A"],
+        "Tong_du_no": [30_000_000],
+        "Du_no_qh": [0],
+    })
+    out = _tao_bang_tong_hop(
+        hien_tai,
+        _snapshot_cu(20_000_000),
+        _snapshot_cu(10_000_000),
+    )
+
+    assert out.loc[0, "DN_dTTr"] == 10_000_000
+    assert out.loc[0, "DN_dNY"] == 20_000_000
+
+
+def test_gan_cbtd_mac_dinh_khong_fallback_xa_dgd_de_tranh_anh_huong_man_live():
+    cbtd_data = {
+        "CB01": {"ho_ten": "A", "pgd": "Hội sở Chi nhánh tỉnh", "ds_dgd": ["Phước Tân"]},
+    }
+    dgd_map = {
+        "Hội sở Chi nhánh tỉnh": {
+            "Phước Tân": {"Phước Tân": {"thon": ["Khu phố Tân Cang"], "ma_thon": ["46005603"]}},
+        }
+    }
+    df = pd.DataFrame({
+        COT_TEN_PGD: ["Hội sở Chi nhánh tỉnh"],
+        COT_MA_THON: ["46005605"],
+        COT_TEN_XA: ["Phước Tân"],
+        COT_TEN_THON: [""],
+    })
+
+    out_default = gan_cbtd_vao_df(df, cbtd_data, dgd_map)
+    out_enabled = gan_cbtd_vao_df(df, cbtd_data, dgd_map, fallback_xa_dgd=True)
+
+    assert pd.isna(out_default.loc[0, "CBTD"])
+    assert out_enabled.loc[0, "CBTD"] == "CB01"

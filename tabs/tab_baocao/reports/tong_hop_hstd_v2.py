@@ -13,7 +13,7 @@ from config import (
     COT_DU_NO_TH, COT_DU_NO_QH, COT_DU_NO_KHOANH,
 )
 from auth import la_phan_he_pgd
-from utils import fmt_so
+from utils import fmt_so, lay_ngay_so_lieu
 from pdf_service import xuat_pdf
 from data.hstd import doc_baseline_merged, ts_baseline_merged
 
@@ -210,17 +210,20 @@ def _doc_baseline_cung_pham_vi(
     pgd_user: str,
     hien_loc_pgd: bool,
     filter_cols: list[str],
+    nam_moc: int | None,
 ) -> tuple[pd.DataFrame | None, int | None]:
-    """Đọc baseline 31/12 năm gần nhất và thu hẹp ĐÚNG phạm vi các bộ lọc hiện tại.
+    """Đọc đúng baseline 31/12 ``nam_moc`` và thu hẹp theo bộ lọc hiện tại.
 
     Tái áp dụng trạng thái widget (PGD, Xã/Chương trình, Nguồn vốn, Khu vực,
     tìm kiếm) lên baseline để cột so sánh cùng khẩu vị với dữ liệu hiện tại.
     Trả (df_baseline hoặc None, năm baseline hoặc None).
     """
-    ds_nam = _ds_nam_baseline_hstd()
-    if not ds_nam:
+    if nam_moc is None:
         return None, None
-    nam_bl = max(ds_nam)
+    ds_nam = _ds_nam_baseline_hstd()
+    if not ds_nam or nam_moc not in ds_nam:
+        return None, None
+    nam_bl = nam_moc
     try:
         df_bl = doc_baseline_merged(nam_bl, ts=ts_baseline_merged(nam_bl))
     except Exception as e:
@@ -651,8 +654,16 @@ def _render_mot_loai_tong_hop(
         and COT_TEN_PGD in df_filtered.columns
         and group_col != COT_TEN_PGD
     )
+    ngay_hien_tai = lay_ngay_so_lieu(df_filtered)
+    nam_moc = ngay_hien_tai.year - 1 if ngay_hien_tai is not None else None
     df_bl_3112, nam_bl = _doc_baseline_cung_pham_vi(
-        selected_report, group_col, role, pgd_user, hien_loc_pgd, filter_cols,
+        selected_report,
+        group_col,
+        role,
+        pgd_user,
+        hien_loc_pgd,
+        filter_cols,
+        nam_moc=nam_moc,
     )
 
     # Tạo báo cáo tổng hợp

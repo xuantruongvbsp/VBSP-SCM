@@ -279,12 +279,74 @@ def test_baseline_nguon_von_khong_khop_giu_schema_de_moc_bang_0(monkeypatch) -> 
         pgd_user="",
         hien_loc_pgd=False,
         filter_cols=[],
+        nam_moc=2025,
     )
 
     assert nam == 2025
     assert result is not None
     assert result.empty
     assert COT_TEN_CT in result.columns
+
+
+def test_baseline_chi_lay_dung_nam_moc_cua_du_lieu_hien_tai(monkeypatch) -> None:
+    calls: list[int] = []
+    df_bl = pd.DataFrame({COT_TEN_CT: ["CT A"], COT_TONG_DU_NO: [100]})
+    monkeypatch.setattr(tong_hop_hstd_v2, "_ds_nam_baseline_hstd", lambda: [2025, 2024])
+    monkeypatch.setattr(tong_hop_hstd_v2, "ts_baseline_merged", lambda nam: float(nam))
+    monkeypatch.setattr(
+        tong_hop_hstd_v2,
+        "doc_baseline_merged",
+        lambda nam, ts=0.0: calls.append(nam) or df_bl,
+    )
+    monkeypatch.setattr(tong_hop_hstd_v2.st, "session_state", {})
+
+    result, nam = _doc_baseline_cung_pham_vi(
+        "ct",
+        COT_TEN_CT,
+        role="admin",
+        pgd_user="",
+        hien_loc_pgd=False,
+        filter_cols=[],
+        nam_moc=2024,
+    )
+
+    assert nam == 2024
+    assert calls == [2024]
+    assert result is not None and not result.empty
+
+
+def test_baseline_thieu_dung_nam_moc_khong_lay_nam_khac(monkeypatch) -> None:
+    monkeypatch.setattr(tong_hop_hstd_v2, "_ds_nam_baseline_hstd", lambda: [2025])
+
+    result, nam = _doc_baseline_cung_pham_vi(
+        "ct",
+        COT_TEN_CT,
+        role="admin",
+        pgd_user="",
+        hien_loc_pgd=False,
+        filter_cols=[],
+        nam_moc=2024,
+    )
+
+    assert result is None
+    assert nam is None
+
+
+def test_baseline_khong_co_nam_hien_tai_khong_fallback_nam_moi_nhat(monkeypatch) -> None:
+    monkeypatch.setattr(tong_hop_hstd_v2, "_ds_nam_baseline_hstd", lambda: [2025, 2024])
+
+    result, nam = _doc_baseline_cung_pham_vi(
+        "ct",
+        COT_TEN_CT,
+        role="admin",
+        pgd_user="",
+        hien_loc_pgd=False,
+        filter_cols=[],
+        nam_moc=None,
+    )
+
+    assert result is None
+    assert nam is None
 
 
 class _FakeContainer:

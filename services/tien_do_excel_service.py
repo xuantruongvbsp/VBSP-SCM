@@ -90,7 +90,7 @@ def xuat_excel_tien_do(df_tonghop: pd.DataFrame,
             ws_th,
             col_left={
                 "Đầu việc", "Loại", "Người phụ trách",
-                "CB KH-NV phụ trách", "Hội sở CN tỉnh",
+                "CB KH-NV phụ trách", "Hội sở CN thành phố",
             },
             col_right={
                 "Số PGD", "Tổng xã", "Đã hoàn thành",

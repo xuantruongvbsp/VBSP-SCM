@@ -63,7 +63,7 @@ MOCKUP_HTML = """
     <tr style="background:#d4edda;">
       <td style="border:1px solid #ccc;padding:4px 8px;">9</td>
       <td style="border:1px solid #ccc;padding:4px 8px; font-weight:600; color:#86efac;">I ← chữ = PGD</td>
-      <td style="border:1px solid #ccc;padding:4px 8px; font-weight:600; color:#86efac;">Hội sở chi nhánh tỉnh</td>
+      <td style="border:1px solid #ccc;padding:4px 8px; font-weight:600; color:#86efac;">Hội sở chi nhánh thành phố</td>
       <td style="border:1px solid #ccc;padding:4px 8px;">92.539</td>
       <td style="border:1px solid #ccc;padding:4px 8px; color:#e67e22;">0</td>
       <td style="border:1px solid #ccc;padding:4px 8px;"></td>

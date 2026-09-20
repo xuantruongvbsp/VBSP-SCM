@@ -28,12 +28,17 @@ from services.upload_service import (
     bom_snapshot_ky_cu,
     bom_snapshot_cdtotkvv_ky_cu,
     chay_lai_snapshot_ky_hien_tai,
+    tao_snapshot_cdtotkvv_theo_thang,
 )
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 def _df_nho() -> pd.DataFrame:
-    return pd.DataFrame({"Ma_KH": ["KH1"], "Tong_du_no": [1_000]})
+    return pd.DataFrame({
+        "Ma_KH": ["KH1"],
+        "Tong_du_no": [1_000],
+        "Ngày số liệu": ["31/07/2026"],
+    })
 
 
 def _kq(ok: bool = True, msg: str = "ok") -> KetQuaUpload:
@@ -49,6 +54,11 @@ def _patch_cache_dir(tmp_path):
 # bom_snapshot_ky_cu  (HSTD)
 # ══════════════════════════════════════════════════════════════════════════════
 class TestBomSnapshotKyCu:
+    @pytest.fixture(autouse=True)
+    def _mot_don_vi_bat_buoc(self, monkeypatch):
+        monkeypatch.setattr(upload_service, "DON_VI_CHI_NHANH", "PGD A")
+        monkeypatch.setattr(upload_service, "DS_PGD", [])
+
     def test_ky_sai_tra_ve_that_bai(self):
         with patch("snapshot_service.luu_snapshot") as m_snap:
             kq = bom_snapshot_ky_cu("2026-13", {"PGD A": "/x.xlsx"})
@@ -82,7 +92,7 @@ class TestBomSnapshotKyCu:
             patch.object(upload_service.db, "ghi_audit") as m_audit,
             patch("services.upload_service.st.cache_data.clear"),
         ):
-            kq = bom_snapshot_ky_cu("2026-07", {"PGD Biên Hòa": str(src)}, "tester")
+            kq = bom_snapshot_ky_cu("2026-07", {"PGD A": str(src)}, "tester")
 
         assert kq.thanh_cong is True
         m_doc.assert_called_once()
@@ -149,7 +159,58 @@ class TestBomSnapshotKyCu:
         ):
             kq = bom_snapshot_ky_cu("2026-07", {"PGD A": str(src)}, "tester")
         assert kq.thanh_cong is False
-        assert "Không đọc được file nào" in kq.thong_bao
+        assert "Chưa ghi snapshot" in kq.thong_bao
+
+    def test_thieu_don_vi_bi_chan_truoc_khi_doc_va_ghi(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(upload_service, "DS_PGD", ["PGD B"])
+        src = tmp_path / "f.xlsx"
+        src.write_bytes(b"dummy")
+        with (
+            _patch_cache_dir(tmp_path),
+            patch.object(upload_service, "_doc_excel_pgd_thanh_df") as m_doc,
+            patch("snapshot_service.luu_snapshot") as m_hstd,
+        ):
+            kq = bom_snapshot_ky_cu("2026-07", {"PGD A": str(src)}, "tester")
+
+        assert kq.thanh_cong is False
+        assert "thiếu 1 đơn vị: PGD B" in kq.thong_bao
+        m_doc.assert_not_called()
+        m_hstd.assert_not_called()
+
+    def test_sai_ngay_so_lieu_bi_chan_truoc_khi_ghi(self, tmp_path):
+        src = tmp_path / "f.xlsx"
+        src.write_bytes(b"dummy")
+        df_sai_ngay = _df_nho().assign(**{"Ngày số liệu": "30/07/2026"})
+        with (
+            _patch_cache_dir(tmp_path),
+            patch.object(upload_service, "_doc_excel_pgd_thanh_df", return_value=df_sai_ngay),
+            patch("snapshot_service.luu_snapshot") as m_hstd,
+            patch.object(upload_service.db, "ghi_audit"),
+        ):
+            kq = bom_snapshot_ky_cu("2026-07", {"PGD A": str(src)}, "tester")
+
+        assert kq.thanh_cong is False
+        assert "yêu cầu 31/07/2026" in kq.thong_bao
+        m_hstd.assert_not_called()
+
+    def test_uy_thac_loi_thi_toan_bo_ket_qua_bao_that_bai(self, tmp_path):
+        src = tmp_path / "f.xlsx"
+        src.write_bytes(b"dummy")
+        with (
+            _patch_cache_dir(tmp_path),
+            patch.object(upload_service, "_doc_excel_pgd_thanh_df", return_value=_df_nho()),
+            patch.object(upload_service, "_normalize_merge_dataframe_for_parquet", side_effect=lambda d: d),
+            patch("snapshot_service.luu_snapshot", return_value=_kq()),
+            patch("snapshot_service.luu_thon_snapshot", return_value=_kq()),
+            patch("snapshot_service.luu_uy_thac_snapshot", return_value=_kq(False, "lỗi ủy thác")),
+            patch("snapshot_service.doc_thon_snapshot", return_value=_df_nho()),
+            patch("snapshot_service.snapshot_la_cuoi_thang", return_value=True),
+            patch.object(upload_service.db, "ghi_audit"),
+        ):
+            kq = bom_snapshot_ky_cu("2026-07", {"PGD A": str(src)}, "tester")
+
+        assert kq.thanh_cong is False
+        assert "Ủy thác ❌" in kq.thong_bao
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -236,6 +297,45 @@ class TestBomSnapshotCdtotkvvKyCu:
             kq = bom_snapshot_cdtotkvv_ky_cu("2026-07", {"f.xlsx": b"PK\x03\x04"}, "tester")
         assert kq.thanh_cong is False
         assert "Không đọc được dữ liệu CDTOTKVV" in kq.thong_bao
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# tao_snapshot_cdtotkvv_theo_thang
+# ══════════════════════════════════════════════════════════════════════════════
+class TestTaoSnapshotCdtotkvvTheoThang:
+    def test_chi_ghi_khi_du_don_vi_va_dung_ky_cdto(self):
+        df = pd.DataFrame({"ten_dv": ["Hội sở", "PGD A"]})
+        with (
+            patch.object(upload_service, "DON_VI_CHI_NHANH", "Hội sở"),
+            patch.object(upload_service, "DS_PGD", ["PGD A"]),
+            patch("data.cdtotkvv.doc_cdtotkvv", return_value=df) as m_doc,
+            patch("services.file_detection_service.ten_doc_ve_don_vi_chuan", side_effect=lambda x: x),
+            patch("data.khtd.doc_cbtd", return_value={"CB01": {}}),
+            patch.object(upload_service.db, "doc_dgd_map", return_value={}),
+            patch("snapshot_service.luu_cdtotkvv_snapshot", return_value=_kq()) as m_cdto,
+            patch("snapshot_service.luu_cbtd_to_tkvv_snapshot", return_value=_kq()) as m_cbtd,
+        ):
+            result = tao_snapshot_cdtotkvv_theo_thang("08/2026", "tester")
+
+        assert result.thanh_cong is True
+        m_doc.clear.assert_called_once_with()
+        assert m_cdto.call_args.args[1:] == ("2026-08", "tester")
+        assert m_cbtd.call_args.args[3:] == ("2026-08", "tester")
+
+    def test_thieu_don_vi_khong_ghi_de_snapshot_cu(self):
+        df = pd.DataFrame({"ten_dv": ["Hội sở"]})
+        with (
+            patch.object(upload_service, "DON_VI_CHI_NHANH", "Hội sở"),
+            patch.object(upload_service, "DS_PGD", ["PGD A"]),
+            patch("data.cdtotkvv.doc_cdtotkvv", return_value=df),
+            patch("services.file_detection_service.ten_doc_ve_don_vi_chuan", side_effect=lambda x: x),
+            patch("snapshot_service.luu_cdtotkvv_snapshot") as m_cdto,
+        ):
+            result = tao_snapshot_cdtotkvv_theo_thang("08/2026", "tester")
+
+        assert result.thanh_cong is False
+        assert "thiếu 1/22 đơn vị" in result.thong_bao
+        m_cdto.assert_not_called()
 
 
 # ══════════════════════════════════════════════════════════════════════════════

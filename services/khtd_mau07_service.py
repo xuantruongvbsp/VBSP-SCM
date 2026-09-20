@@ -607,7 +607,7 @@ def xuat_mau07_word(
     # Các đoạn nội dung chuẩn
     body_paras = [
         (f"Căn cứ Quyết định số        /QĐ-NHCS ngày     /     /      của Trưởng Ban đại "
-         f"diện HĐQT NHCSXH tỉnh về việc {loai_lower} kế hoạch tín dụng năm {nam} cho các xã;"),
+         f"diện HĐQT NHCSXH thành phố về việc {loai_lower} kế hoạch tín dụng năm {nam} cho các xã;"),
         "Căn cứ tổng hợp nhu cầu vốn tín dụng chính sách tại các thôn, ấp.",
         (f"Ủy ban nhân dân xã {xa} thông báo {loai_lower} kế hoạch dư nợ năm {nam} "
          f"của các thôn, ấp theo danh mục đính kèm."),

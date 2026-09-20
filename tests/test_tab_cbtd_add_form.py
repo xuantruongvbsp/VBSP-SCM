@@ -57,6 +57,56 @@ def test_ky_hstd_hien_tai_lay_tu_ngay_so_lieu_khong_lay_ngay_may():
     assert ngay.strftime("%d/%m/%Y") == "31/07/2026"
 
 
+def test_tong_quan_cbtd_truyen_ky_hien_tai_cho_service():
+    source = inspect.getsource(tab_cbtd.render)
+
+    assert "_nam, _thang, _ngay = _ky_hstd_hien_tai(df)" in source
+    assert "tong_hop_hstd_theo_cbtd(cbtd_data, dgd_map, df, yyyy=_nam, mm=_thang)" in source
+
+
+def test_ky_so_sanh_to_tkvv_tinh_tu_ky_cdto_khong_tu_hstd():
+    assert tab_cbtd._cac_ky_so_sanh_cdto("08/2026") == ("2026-07", "2025-12")
+    assert tab_cbtd._cac_ky_so_sanh_cdto("01/2026") == ("2025-12", "2025-12")
+    assert tab_cbtd._cac_ky_so_sanh_cdto(None) == (None, None)
+
+
+def test_bang_to_tkvv_doc_snapshot_dung_moc_cua_cdto(monkeypatch):
+    from services import cbtd_dia_ban_service, tongquan_cdto_service
+    import snapshot_service
+
+    df_cdto = pd.DataFrame([
+        {"ten_dv": "PGD A", "ten_xa": "Xã A", "ma_to": "T01", "xep_loai": "Tốt"},
+    ])
+    monkeypatch.setattr(
+        tongquan_cdto_service,
+        "load_cdto_toan_cn",
+        lambda: {"df_raw": df_cdto, "thang_hien": "08/2026"},
+    )
+    monkeypatch.setattr(
+        cbtd_dia_ban_service,
+        "lay_to_theo_cbtd",
+        lambda *_args: {
+            "CB01": [{"ma_to": "T01", "ten_xa": "Xã A", "xep_loai": "Tốt"}],
+        },
+    )
+    calls: list[str] = []
+
+    def _doc(ky: str) -> pd.DataFrame:
+        calls.append(ky)
+        return pd.DataFrame([{"ma_cb": "CB01", "so_to": 1, "so_tot": 1}])
+
+    monkeypatch.setattr(snapshot_service, "doc_cbtd_to_tkvv_snapshot", _doc)
+
+    result, thang_hien, ky_truoc, ky_baseline = tab_cbtd._bang_to_tkvv(
+        {"CB01": {"ho_ten": "A", "pgd": "PGD A"}},
+        {},
+    )
+
+    assert not result.empty
+    assert (thang_hien, ky_truoc, ky_baseline) == ("08/2026", "2026-07", "2025-12")
+    assert calls == ["2026-07", "2025-12"]
+
+
 def test_tao_bang_tong_hop_sap_giam_va_tinh_delta_khong_lan_nan():
     hien_tai = pd.DataFrame([
         {"Ma_CBTD": "CB01", "Ho_ten": "A", "PGD": "PGD A",
@@ -136,11 +186,14 @@ def test_chuan_bi_pdf_bang_du_no_giu_gach_cho_delta_thieu_ky():
 
 def test_pdf_bang_du_no_khong_cong_them_dong_tong_lan_hai():
     source = inspect.getsource(tab_cbtd.render)
-    pdf_block = source.split('if st.button("🖨️ In PDF dư nợ theo CBTD"', 1)[1]
+    pdf_block = source.split('if st.button("🖨️ In PDF tổng quan CBTD"', 1)[1]
     pdf_block = pdf_block.split('if state.downloads.has("cbtd_tq_pdf")', 1)[0]
 
     assert "them_dong_tong=False" in pdf_block
     assert "them_dong_tong=True" not in pdf_block
+    assert "bang_phu=[" in pdf_block
+    assert "CỤM CHỈ TIÊU NỢ CẦN QUAN TÂM" in pdf_block
+    assert "CHẤT LƯỢNG TỔ TK&VV" in pdf_block
 
 
 def test_loc_vay_truc_tiep_noxh_chi_lay_ct12_con_du_no():

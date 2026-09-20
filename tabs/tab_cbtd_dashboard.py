@@ -27,6 +27,7 @@ import db
 from logger import get_logger
 from auth import la_phan_he_cn, la_executive, normalize_role
 from components.delta_card import kpi_row
+from config import TEN_PGD_TO_MA
 from data.khtd import doc_cbtd
 from tabs.base_tab import TabContext
 from utils import fmt_so, fmt_ty, hien_thi_dataframe_phan_trang, xuat_excel, ten_file_xuat
@@ -37,6 +38,7 @@ from services.cbtd_dia_ban_service import (
     xep_hang_cbtd,
     phan_tich_xu_huong_to,
     _count_ap,
+    _normalize,
 )
 
 logger = get_logger(__name__)
@@ -53,12 +55,25 @@ _VBSP_GREY = "#757575"
 
 
 def _doc_cdtotkvv_moi_nhat() -> "pd.DataFrame | None":
-    """Đọc file CDTOTKVV tháng gần nhất (tập trung từ pgd_data)."""
+    """Đọc CDTOTKVV kỳ mới nhất theo chuỗi ưu tiên chuẩn.
+
+    Ưu tiên nguồn trung tâm `data/cdtotkvv/` (doc_cdtotkvv theo kỳ, đã dedupe);
+    chỉ fallback `pgd_data/*/cdtotkvv_latest.xlsx` khi nguồn trung tâm rỗng.
+    """
+    try:
+        from services.tongquan_cdto_service import load_cdto_toan_cn
+        kq = load_cdto_toan_cn() or {}
+        df_raw = kq.get("df_raw")
+        if df_raw is not None and not df_raw.empty:
+            return df_raw
+    except Exception as e:
+        logger.error("_doc_cdtotkvv_moi_nhat: lỗi đọc CDTOTKVV nguồn trung tâm — %s", e, exc_info=True)
+
     try:
         from services.cdtotkvv_service import tong_hop_tu_pgd_data
         return tong_hop_tu_pgd_data()
     except Exception as e:
-        logger.error("_doc_cdtotkvv_moi_nhat: lỗi đọc CDTOTKVV — %s", e, exc_info=True)
+        logger.error("_doc_cdtotkvv_moi_nhat: lỗi fallback CDTOTKVV pgd_data — %s", e, exc_info=True)
         return None
 
 
@@ -140,6 +155,71 @@ def _loc_cbtd_data(cbtd_data: dict, loc_pgd: str, loc_cb: str) -> dict:
             continue
         out[ma] = info
     return out
+
+
+def _norm_ma_dv(val: object) -> str:
+    text = str(val or "").strip()
+    if not text or text.lower() in {"nan", "none", "<na>"}:
+        return ""
+    digits = "".join(ch for ch in text if ch.isdigit())
+    return digits.zfill(6) if digits else ""
+
+
+def _normalize_xa_match(val: object) -> str:
+    text = _normalize(val)
+    for prefix in ("xã ", "phường ", "thị trấn ", "thi tran "):
+        if text.startswith(prefix):
+            return text[len(prefix):].strip()
+    return text
+
+
+def _mask_cdto_pgd(df: pd.DataFrame, ten_pgd: str) -> pd.Series:
+    mask = pd.Series(False, index=df.index)
+    if "ten_dv" in df.columns:
+        mask = mask | df["ten_dv"].map(_normalize).eq(_normalize(ten_pgd))
+    ma_pgd = TEN_PGD_TO_MA.get(ten_pgd, "")
+    if "ma_dv" in df.columns and ma_pgd:
+        mask = mask | df["ma_dv"].map(_norm_ma_dv).eq(_norm_ma_dv(ma_pgd))
+    return mask
+
+
+def _loc_df_cdto(
+    df_cdto: "pd.DataFrame | None",
+    cbtd_data: dict,
+    dgd_map: dict,
+    loc_pgd: str,
+    loc_cb: str,
+) -> "pd.DataFrame | None":
+    """Lọc df_cdtotkvv theo bộ lọc PGD/CBTD đang chọn (khớp theo địa bàn xã)."""
+    if df_cdto is None or df_cdto.empty:
+        return df_cdto
+
+    df = df_cdto
+    if loc_pgd != "(Tất cả)":
+        df = df[_mask_cdto_pgd(df, loc_pgd)]
+
+    if loc_cb != "(Tất cả)" and loc_cb in cbtd_data:
+        info = cbtd_data[loc_cb]
+        pgd_cb = info.get("pgd", "")
+        ds_dgd = info.get("ds_dgd", []) or []
+        if pgd_cb:
+            df = df[_mask_cdto_pgd(df, pgd_cb)]
+        if "ten_xa" not in df.columns:
+            return df.iloc[0:0]
+        xa_set: set[str] = set()
+        dgd_set = {_normalize(dgd_name) for dgd_name in ds_dgd}
+        for dgd_name in ds_dgd:
+            for xa_k, xa_block in (dgd_map.get(pgd_cb, {}) or {}).items():
+                if not isinstance(xa_block, dict):
+                    continue
+                dgd_keys = {_normalize(key) for key in xa_block.keys()}
+                if _normalize(dgd_name) in dgd_keys:
+                    xa_set.add(_normalize_xa_match(xa_k))
+        if not xa_set and dgd_set:
+            return df.iloc[0:0]
+        df = df[df["ten_xa"].map(_normalize_xa_match).isin(xa_set)]
+
+    return df
 
 
 def _build_bang_pivot(
@@ -637,7 +717,8 @@ def render(tab: "DeltaGenerator | None" = None, **kwargs) -> None:
             cbtd_data = _loc_cbtd_data(cbtd_data_raw, loc_pgd, loc_cb)
 
         # ── KPI Row ─────────────────────────────────────────────────────────
-        kpi = tom_tat_kpi(cbtd_data, dgd_map, df_cdto)
+        df_cdto_loc = _loc_df_cdto(df_cdto, cbtd_data, dgd_map, loc_pgd, loc_cb)
+        kpi = tom_tat_kpi(cbtd_data, dgd_map, df_cdto_loc)
 
         kpi_row(
             cols=[

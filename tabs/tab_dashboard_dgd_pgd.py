@@ -16,6 +16,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
     from components.delta_card import kpi_row as _kpi_row
     from services.cbtd_dia_ban_service import tom_tat_kpi as _tom_kpi, canh_bao_cbtd_dia_ban as _canh_bao
     from services.cdtotkvv_service import tong_hop_tu_pgd_data as _tong_hop_cdto, loc_df as _loc_df
+    from services.tongquan_cdto_service import load_cdto_toan_cn as _load_cdto_toan_cn
     from data.khtd import doc_cbtd as _dc
 
     pgd_user = kwargs.get("pgd_user", "")
@@ -51,11 +52,14 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
 
         df_cdto_all = None
         try:
-            df_cdto_all = _tong_hop_cdto()
+            kq_cdto = _load_cdto_toan_cn() or {}
+            df_cdto_all = kq_cdto.get("df_raw")
+            if df_cdto_all is None or df_cdto_all.empty:
+                df_cdto_all = _tong_hop_cdto()
             if df_cdto_all is not None and not df_cdto_all.empty:
                 df_cdto_all = _loc_df(df_cdto_all, "pgd", pgd_user)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error("tab_dashboard_dgd_pgd: lỗi đọc CDTOTKVV — %s", e, exc_info=True)
 
         kpi = _tom_kpi(cbtd_data, dgd_pgd, df_cdto_all)
 

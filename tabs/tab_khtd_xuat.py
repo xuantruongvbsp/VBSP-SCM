@@ -888,7 +888,7 @@ def xuat_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None" =
 
         # Tên sheet: tối đa 31 ký tự (giới hạn Excel)
         ten_sheet = (
-            ten_dv.replace("Hội sở Chi nhánh tỉnh", "Hội sở CN tỉnh")
+            ten_dv.replace("Hội sở Chi nhánh tỉnh", "Hội sở CN thành phố")
                   .replace("PGD ", "")
                   .strip()[:31]
         )

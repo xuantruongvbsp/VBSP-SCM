@@ -42,3 +42,27 @@ def test_xuat_pdf_co_chart_o_rong_va_text_dac_biet_khong_crash():
     assert "KU202600001" in text
     assert "Nguyễn & Co" in text
     assert "3.000.000" in text
+
+
+def test_xuat_pdf_co_chart_bang_phu_khong_tao_trang_trang_khi_bang_chinh_rong():
+    pytest.importorskip("reportlab", reason="Chưa cài thư viện reportlab")
+
+    pdf_bytes = xuat_pdf_co_chart(
+        pd.DataFrame(),
+        "Báo cáo nhiều bảng",
+        "tester",
+        bang_phu=[{
+            "tieu_de": "Bảng phụ kiểm tra",
+            "df": pd.DataFrame({"STT": [1], "Chỉ tiêu": ["Nợ cần quan tâm"], "Số món": [3]}),
+            "cols_dem": ["Số món"],
+        }],
+        them_dong_tong=False,
+    )
+
+    assert pdf_bytes.startswith(b"%PDF")
+    with pdfplumber.open(BytesIO(pdf_bytes)) as pdf:
+        text_by_page = [page.extract_text() or "" for page in pdf.pages]
+
+    assert len(text_by_page) == 1
+    assert "BẢNG PHỤ KIỂM TRA" in text_by_page[0]
+    assert "Nợ cần quan tâm" in text_by_page[0]

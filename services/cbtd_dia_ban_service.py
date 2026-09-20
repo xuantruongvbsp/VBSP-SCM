@@ -33,6 +33,7 @@ from config import (
     COT_MA_THON,
     COT_NGAY_SL,
     COT_TEN_CT,
+    COT_MA_CHUONG_TRINH,
     COT_MA_KH,
     COT_SO_KU,
     COT_NGAY_VAY,
@@ -86,6 +87,66 @@ def _normalize(s) -> str:
     except Exception:
         return ""
     return "" if text in {"nan", "none", "<na>"} else text
+
+
+def _nonempty_text_series(df: pd.DataFrame, col: str) -> pd.Series:
+    if col not in df.columns:
+        return pd.Series("", index=df.index, dtype="string")
+    s = df[col].astype("string").str.strip()
+    return s.mask(s.str.lower().isin(["", "nan", "none", "null", "<na>"]), "")
+
+
+def mask_noxh_truc_tiep(df: pd.DataFrame) -> pd.Series:
+    """Dòng vay trực tiếp NOXH/NĐ100 không thuộc báo cáo Điểm GD."""
+    if df is None or df.empty:
+        return pd.Series(False, index=getattr(df, "index", None))
+
+    if COT_HINH_THUC_VAY in df.columns:
+        htv1 = pd.to_numeric(df[COT_HINH_THUC_VAY], errors="coerce").eq(1)
+    else:
+        htv1 = pd.Series(False, index=df.index)
+
+    noxh = pd.Series(False, index=df.index)
+    if COT_MA_CHUONG_TRINH in df.columns:
+        noxh |= pd.to_numeric(df[COT_MA_CHUONG_TRINH], errors="coerce").eq(12)
+    if COT_TEN_CT in df.columns:
+        ten_ct = df[COT_TEN_CT].astype("string").str.casefold().fillna("")
+        noxh |= ten_ct.str.contains("nhà ở xã hội|nghị định số 100|cvnha", regex=True)
+    return htv1 & noxh
+
+
+def chuan_bi_hstd_bao_cao_dgd(
+    df: pd.DataFrame | None,
+    *,
+    loai_noxh_truc_tiep: bool = True,
+) -> pd.DataFrame:
+    """Làm sạch HSTD trước khi cộng số liệu theo Điểm GD/CBTD.
+
+    Chuẩn báo cáo Điểm GD/PDF:
+    - Chỉ tính dòng còn tổng dư nợ dương.
+    - Bỏ dòng không có Số khế ước.
+    - Khử trùng cùng một Số khế ước để tránh double-count dư nợ.
+    - Loại riêng NOXH vay trực tiếp; không loại mọi HTV=1 vì một số khoản
+      trực tiếp khác vẫn xuất hiện trong báo cáo Điểm GD.
+    """
+    if df is None or df.empty:
+        return pd.DataFrame() if df is None else df.copy()
+
+    out = df.copy()
+    if COT_TONG_DU_NO in out.columns:
+        du_no = pd.to_numeric(out[COT_TONG_DU_NO], errors="coerce").fillna(0)
+        out = out.loc[du_no.gt(0)].copy()
+
+    if COT_SO_KU in out.columns:
+        so_ku = _nonempty_text_series(out, COT_SO_KU)
+        out = out.loc[so_ku.ne("")].copy()
+        so_ku = _nonempty_text_series(out, COT_SO_KU)
+        out = out.loc[~so_ku.duplicated(keep="first")].copy()
+
+    if loai_noxh_truc_tiep and not out.empty:
+        out = out.loc[~mask_noxh_truc_tiep(out)].copy()
+
+    return out
 
 
 def _count_ap(pgd: str, ds_dgd: list, dgd_map: dict) -> int:
@@ -474,15 +535,18 @@ def tom_tat_kpi(
     pct_to_dat = 0.0
 
     if df_cdtotkvv is not None and not df_cdtotkvv.empty:
-        so_to_tong = len(df_cdtotkvv)
-        if "tong_diem" in df_cdtotkvv.columns:
+        from services.cdtotkvv_service import _df_unique_theo_to, _them_cot_chuan_to
+        df_to = _df_unique_theo_to(_them_cot_chuan_to(df_cdtotkvv))
+        so_to_tong = int(len(df_to))
+        if "tong_diem" in df_to.columns:
             diem_tb = round(
-                float(pd.to_numeric(df_cdtotkvv["tong_diem"], errors="coerce").mean() or 0), 2
+                float(pd.to_numeric(df_to["tong_diem"], errors="coerce").mean() or 0), 2
             )
-        if "xep_loai" in df_cdtotkvv.columns:
-            so_to_yeu = int((df_cdtotkvv["xep_loai"] == "Yếu").sum())
-            so_to_tb_yeu = int(df_cdtotkvv["xep_loai"].isin({"Yếu", "Trung bình"}).sum())
-            so_to_dat = int(df_cdtotkvv["xep_loai"].isin({"Tốt", "Khá"}).sum())
+        if "xep_loai" in df_to.columns:
+            xep_loai = df_to["xep_loai"].astype("string").fillna("").str.strip().str.casefold()
+            so_to_yeu = int(xep_loai.eq("yếu").sum())
+            so_to_tb_yeu = int(xep_loai.isin({"yếu", "trung bình"}).sum())
+            so_to_dat = int(xep_loai.isin({"tốt", "khá"}).sum())
             pct_to_dat = round(so_to_dat / so_to_tong * 100, 1) if so_to_tong else 0.0
 
     return {
@@ -680,9 +744,7 @@ def tong_hop_hstd_theo_cbtd(
             try:
                 from data.khtd import gan_cbtd_vao_df
                 df_joined = gan_cbtd_vao_df(df_hstd, scoped, dgd_map)
-                if COT_HINH_THUC_VAY in df_joined.columns:
-                    htv = pd.to_numeric(df_joined[COT_HINH_THUC_VAY], errors="coerce")
-                    df_joined = df_joined[htv != 1]
+                df_joined = chuan_bi_hstd_bao_cao_dgd(df_joined)
             except Exception as e:
                 logger.error("tong_hop_hstd_theo_cbtd join HSTD: %s", e, exc_info=True)
                 df_joined = None
@@ -868,10 +930,7 @@ def tong_hop_hstd_theo_thon(
     if df_hstd is None or df_hstd.empty:
         return pd.DataFrame(columns=columns)
 
-    df = df_hstd.copy()
-    if COT_HINH_THUC_VAY in df.columns:
-        htv = pd.to_numeric(df[COT_HINH_THUC_VAY], errors="coerce")
-        df = df[htv != 1]
+    df = chuan_bi_hstd_bao_cao_dgd(df_hstd)
     if df.empty:
         return pd.DataFrame(columns=columns)
 
@@ -1026,13 +1085,18 @@ def tong_hop_thon_snapshot_theo_cbtd(
     if COT_TEN_PGD in df.columns:
         pgd_clean = df[COT_TEN_PGD].astype("string").fillna("").str.strip()
         legacy_pgd = pgd_clean.eq("") | pgd_clean.str.upper().eq("__UNKNOWN__")
-        df_co_pgd = gan_cbtd_vao_df(df.loc[~legacy_pgd], cbtd_data, dgd_map)
+        df_co_pgd = gan_cbtd_vao_df(
+            df.loc[~legacy_pgd], cbtd_data, dgd_map, fallback_xa_dgd=True
+        )
         df_cu = df.loc[legacy_pgd].drop(columns=[COT_TEN_PGD])
-        df_khong_pgd = gan_cbtd_vao_df(df_cu, cbtd_data, dgd_map) if not df_cu.empty else pd.DataFrame()
+        df_khong_pgd = (
+            gan_cbtd_vao_df(df_cu, cbtd_data, dgd_map, fallback_xa_dgd=True)
+            if not df_cu.empty else pd.DataFrame()
+        )
         df = pd.concat([df_co_pgd, df_khong_pgd], ignore_index=True, sort=False)
     else:
         # Snapshot schema cũ: chỉ gán các xã/thôn hoặc mã thôn duy nhất toàn CN.
-        df = gan_cbtd_vao_df(df, cbtd_data, dgd_map)
+        df = gan_cbtd_vao_df(df, cbtd_data, dgd_map, fallback_xa_dgd=True)
 
     df = df.rename(columns={"CBTD": "ma_cb"})
     df = df[df["ma_cb"].notna()].copy()
@@ -1091,13 +1155,10 @@ def tong_hop_hstd_cbtd_xa_chuong_trinh(
         if "CBTD" not in df_joined.columns or COT_TONG_DU_NO not in df_joined.columns:
             return pd.DataFrame(columns=columns)
 
-        if COT_HINH_THUC_VAY in df_joined.columns:
-            htv = pd.to_numeric(df_joined[COT_HINH_THUC_VAY], errors="coerce")
-            df_joined = df_joined[htv.fillna(2) != 1].copy()
+        df_joined = chuan_bi_hstd_bao_cao_dgd(df_joined)
 
         df_joined = df_joined[df_joined["CBTD"].notna()].copy()
         df_joined[COT_TONG_DU_NO] = pd.to_numeric(df_joined[COT_TONG_DU_NO], errors="coerce").fillna(0)
-        df_joined = df_joined[df_joined[COT_TONG_DU_NO] > 0].copy()
         if scope_ma_cb:
             df_joined = df_joined[df_joined["CBTD"] == scope_ma_cb].copy()
         if df_joined.empty:
@@ -1397,8 +1458,7 @@ def lay_kpi_cbtd_theo_thang(
             logger.error("lay_kpi_cbtd_theo_thang import gan_cbtd_vao_df: %s", e, exc_info=True)
             return result
         df_joined = gan_cbtd_vao_df(df_hstd, {ma_cb: info}, dgd_map)
-        if COT_HINH_THUC_VAY in df_joined.columns:
-            df_joined = df_joined[df_joined[COT_HINH_THUC_VAY] != 1]
+        df_joined = chuan_bi_hstd_bao_cao_dgd(df_joined)
         df_cb = df_joined[df_joined["CBTD"] == ma_cb] if "CBTD" in df_joined.columns else df_joined.iloc[0:0]
         if df_cb.empty:
             return result
@@ -1488,8 +1548,7 @@ def top_3_viec_uu_tien(
         except Exception:
             return viecs
         df_joined = gan_cbtd_vao_df(df_hstd, {ma_cb: info}, dgd_map)
-        if COT_HINH_THUC_VAY in df_joined.columns:
-            df_joined = df_joined[df_joined[COT_HINH_THUC_VAY] != 1]
+        df_joined = chuan_bi_hstd_bao_cao_dgd(df_joined)
         df_cb = df_joined[df_joined["CBTD"] == ma_cb] if "CBTD" in df_joined.columns else df_joined.iloc[0:0]
         if df_cb.empty:
             return viecs

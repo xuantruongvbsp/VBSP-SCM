@@ -1,5 +1,115 @@
 # CHANGELOG
 
+## [2026-09-20] — Khóa an toàn upload HSTD toàn Chi nhánh
+- `services/upload_service.py` — chuẩn hóa alias ở cột `Tên PGD`, báo tên không nhận diện, bắt buộc đúng đủ 22 đơn vị trước khi ghi và rollback toàn bộ file `hstd_khnv` nếu một lần ghi thất bại.
+- `tabs/tab_upload_khnv/_upload_toan_cn.py` — chỉ nhận `.xlsx`, nhận diện lại file theo hash nội dung, khóa nút upload khi thiếu đơn vị và chỉ đưa vào hàng chờ merge sau khi lưu đủ 22/22.
+- `tests/test_hstd_toan_cn.py` — thêm regression cho alias đơn vị, tên lạ, bộ file thiếu và rollback khi lỗi giữa chừng.
+- `BUGMAP.md`, `TEST_COVERAGE.md` — ghi nhận lỗi upload một phần và phạm vi kiểm thử mới.
+
+## [2026-09-20] — Thêm upload HSTD toàn Chi nhánh (tách 1 file gộp → 22 PGD)
+- `services/upload_service.py` — thêm `tach_file_hstd_toan_cn()` (tách theo cột "Tên PGD", cùng cấu trúc BCQUERY như NQ11) và `xu_ly_hstd_toan_cn()` (lưu từng PGD dưới dạng `hstd_khnv`).
+- `tabs/tab_upload_khnv/_upload_toan_cn.py` — thêm `render_hstd_toan_cn()`: preview 22 đơn vị + nút upload → hàng chờ merge.
+- `tabs/tab_upload_khnv/__init__.py` — thêm sub-tab "📊 HSTD toàn CN" vào mục "🏢 Toàn Chi nhánh".
+
+## [2026-09-20] — Khóa snapshot Tổ TK&VV theo đúng kỳ CDTOTKVV
+- `tabs/tab_cbtd.py` — bảng Chất lượng Tổ TK&VV tự tính tháng trước và 31/12 năm trước từ kỳ CDTOTKVV hiện tại; không còn dùng mốc HSTD, thiếu đúng kỳ thì để trống Δ.
+- `services/upload_service.py`, `tabs/tab_upload_khnv/_upload_toan_cn.py` — upload CDTOTKVV tự tạo snapshot theo kỳ của file khi đủ 22 đơn vị; upload thiếu không ghi đè snapshot; bỏ tạo CDTOTKVV/CBTD–Tổ trong luồng merge/chạy lại HSTD.
+- `snapshot_service.py` — snapshot CDTOTKVV thay trọn kỳ trong transaction; thêm hàm xóa riêng kỳ CDTOTKVV/CBTD–Tổ bị gắn sai mà không ảnh hưởng các snapshot HSTD khác.
+- `tabs/snapshot_management.py` — làm rõ nút chạy lại kỳ hiện tại chỉ xử lý HSTD/Thôn/Ủy thác; CDTOTKVV có kỳ độc lập.
+- `tests/test_tab_cbtd_add_form.py`, `tests/test_bom_snapshot_ky_cu.py`, `tests/test_cdtotkvv_history.py`, `tests/test_snapshot_service.py` — thêm regression chống trộn kỳ, ghi snapshot thiếu đơn vị, giữ dòng cũ và xóa chéo bảng.
+- DB — đã backup trước sửa; tái tạo snapshot CDTOTKVV/CBTD–Tổ các kỳ `2025-12`, `2026-04`, `2026-06`, `2026-07`, `2026-08` từ nguồn lịch sử đủ 22 đơn vị; xóa riêng kỳ giả `2026-09`; integrity check `ok`.
+- `BUGMAP.md`, `TEST_COVERAGE.md` — cập nhật E26 và phạm vi kiểm thử snapshot/CDTOTKVV.
+
+## [2026-09-20] — Cập nhật test PDF tổng quan CBTD nhiều bảng
+- `tests/test_tab_cbtd_add_form.py` — test nút PDF Tổng quan CBTD đổi sang nhãn mới `In PDF tổng quan CBTD` và kiểm tra block xuất PDF có truyền `bang_phu` cho 2 bảng phụ.
+- `components/export_pdf.py`, `tests/test_export_pdf_component.py` — tránh tạo trang đầu trống khi bảng chính rỗng nhưng vẫn có `bang_phu`; thêm regression kiểm PDF phụ vẫn in ngay trang đầu.
+
+## [2026-09-20] — Bảng 🏅 Chất lượng Tổ TK&VV đọc đúng kỳ CDTOTKVV
+- `tabs/tab_cbtd.py` — `_bang_to_tkvv()` đổi nguồn số liệu "hiện tại" từ `tong_hop_tu_pgd_data()` (đọc `cdtotkvv_latest.xlsx`, dễ bị cũ) sang `load_cdto_toan_cn()` theo kỳ CDTOTKVV mới nhất (fallback `tong_hop_tu_pgd_data()` khi rỗng); hàm trả thêm kỳ và caption hiển thị đúng kỳ chấm điểm Tổ TK&VV.
+- `BUGMAP.md` — thêm mục E26.
+
+## [2026-09-20] — CBTD: in PDF đủ 3 bảng + tăng cỡ chữ
+- `components/export_pdf.py` — `xuat_pdf_co_chart()` thêm tham số `bang_phu` để in nhiều bảng (mỗi bảng 1 trang kèm tiêu đề phụ); tách logic render bảng thành helper nội bộ `_render_bang()`; tăng cỡ chữ động (bảng >16 cột: 7.5→8pt, các mức còn lại tăng ~0.5pt).
+- `tabs/tab_cbtd.py` — khối "Tổng quan theo CBTD": nút "In PDF" giờ in đủ 3 bảng (Dư nợ + Nợ cần quan tâm + Chất lượng Tổ TK&VV) qua `bang_phu`; Excel thêm sheet `Chat_luong_To_TKVV`.
+
+## [2026-09-20] — Khóa lọc CDTOTKVV theo PGD khi chọn CBTD
+- `tabs/tab_cbtd_dashboard.py` — `_loc_df_cdto()` khi chọn riêng CBTD sẽ lọc CDTOTKVV theo PGD của CBTD trước khi lọc xã/Điểm GD, tránh cộng nhầm Tổ của PGD khác có cùng tên xã; đồng thời khớp tên Điểm GD bằng chuẩn hóa khoảng trắng/hoa thường.
+- `tests/test_tab_cbtd_dashboard.py` — thêm regression cho tình huống hai PGD cùng tên xã, bộ lọc CBTD phải chỉ giữ Tổ thuộc PGD của CBTD đó.
+- `BUGMAP.md` — cập nhật mục C31 với rủi ro lọc CBTD theo tên xã chưa khóa PGD.
+
+## [2026-09-20] — Rà soát fallback thôn lịch sử cho hai mốc so sánh CBTD
+- `tests/test_cbtd_dia_ban_review.py` — thêm regression chặn fallback khi một Điểm GD thuộc nhiều CBTD và kiểm tra xuyên suốt fallback mã thôn cũ được dùng cho cả chênh lệch tháng trước lẫn 31/12 năm trước.
+- `BUGMAP.md` — cập nhật mục C63 với hai hàng rào kiểm thử mới; không thay đổi HSTD live, snapshot hoặc DB.
+
+## [2026-09-19] — Sửa chênh lệch dư nợ CBTD so tháng trước/năm trước khi mã thôn cũ đổi sau sáp nhập
+- `data/khtd.py` — `gan_cbtd_vao_df()` thêm công tắc `fallback_xa_dgd=False`; fallback lịch sử chỉ chạy khi được bật, sau khi không khớp bằng `(PGD, Mã thôn)` và `(PGD, Xã, Thôn)`, gán theo `(PGD, Tên xã)` khi tên xã trùng chính xác một Điểm GD hiện tại và chỉ thuộc một CBTD.
+- `services/cbtd_dia_ban_service.py` — chỉ bật `fallback_xa_dgd=True` trong `tong_hop_thon_snapshot_theo_cbtd()` khi đọc `thon_snapshot` kỳ cũ phục vụ so sánh CBTD; các màn live dùng `gan_cbtd_vao_df()` vẫn giữ hành vi cũ.
+- `tests/test_cbtd_dia_ban_review.py` — thêm regression cho `thon_snapshot` kỳ cũ còn mã thôn cũ/tên thôn trống nhưng vẫn phải gán đúng CBTD, đồng thời bảo vệ mặc định `gan_cbtd_vao_df()` không fallback để tránh ảnh hưởng màn live.
+- Kiểm tra dữ liệu thật: snapshot Hội sở `2026-07` gán CBTD tăng từ 336,38 tỷ lên 681,42 tỷ; `2026-08` giữ 677,43 tỷ, mốc `2025-12` còn 636,43 tỷ sau khi loại phần không thuộc Điểm GD.
+
+## [2026-09-19] — Khôi phục snapshot 2026-07 đủ 22 đơn vị và chặn bơm thiếu dữ liệu
+- `services/upload_service.py` — `bom_snapshot_ky_cu()` chỉ ghi khi có đúng đủ 22 đơn vị, mọi file đọc thành công và ngày số liệu đúng ngày cuối kỳ; kết quả chung nay tính cả snapshot Ủy thác.
+- `tabs/snapshot_management.py` — không còn âm thầm lấy file cuối khi trùng đơn vị: tự bỏ bản sao giống hệt, cho chọn khi hai file khác nhau, khóa nút khi thiếu đơn vị và yêu cầu xác nhận trước khi thay kỳ đã tồn tại.
+- `snapshot_service.py` — snapshot Ủy thác thay trọn kỳ trong transaction; khi BCQUERY 174 cột để trống `Tên ĐVUT`/`Tên tổ`, suy ra Hội/Tổ từ `Mã PGD + Mã tổ` qua CDTOTKVV.
+- `tests/test_bom_snapshot_ky_cu.py`, `tests/test_snapshot_service.py` — thêm regression cho thiếu đơn vị, sai ngày, lỗi Ủy thác, xóa dòng cũ cùng kỳ và fallback Hội/Tổ.
+- DB — khôi phục kỳ `2026-07` từ staging sạch 22/22 đơn vị: HSTD 412 dòng, Thôn 974 dòng, Ủy thác 4.751 dòng; toàn bộ ngày số liệu `31/07/2026`, `PRAGMA integrity_check = ok`.
+
+## [2026-09-19] — Bơm snapshot kỳ cũ: tự xóa ô upload sau khi bơm xong
+- `tabs/snapshot_management.py` — thêm version-key cho `st.file_uploader` trong mục "Bơm snapshot kỳ cũ"; tăng `ql_snap_bom_upload_ver` trước `st.rerun()` ở cả nhánh HSTD và CDTOTKVV để ô upload tự trống sau khi bơm (khớp pattern tab Upload chính).
+
+## [2026-09-19] — Fix metric `Tổng Tổ TK&VV` ở Dashboard CBTD & Địa bàn
+- `tabs/tab_cbtd_dashboard.py` ~dòng 55 — `_doc_cdtotkvv_moi_nhat()` đổi sang chuỗi ưu tiên chuẩn: `load_cdto_toan_cn()["df_raw"]` (nguồn trung tâm `data/cdtotkvv/` theo kỳ), chỉ fallback `tong_hop_tu_pgd_data()` khi rỗng.
+- `tabs/tab_cbtd_dashboard.py` ~dòng 150 — thêm `_loc_df_cdto()` lọc `df_cdtotkvv` theo bộ lọc PGD (`ten_dv`)/CBTD (`ten_xa` thuộc địa bàn ĐGD); import thêm `_normalize`.
+- `tabs/tab_cbtd_dashboard.py` ~dòng 150 — làm chắc `_loc_df_cdto()`: PGD có thể khớp bằng `ma_dv` khi `ten_dv` lệch; xã/phường khớp mềm khi nguồn CDTOTKVV có tiền tố `Xã/Phường/Thị trấn` còn `dgd_map` không có.
+- `tabs/tab_dashboard_dgd_pgd.py` ~dòng 52 — mini dashboard PGD cũng ưu tiên nguồn trung tâm `load_cdto_toan_cn()["df_raw"]`, chỉ fallback `pgd_data` khi rỗng.
+- `tabs/tab_cbtd_dashboard.py` ~dòng 676 — áp dụng `df_cdto_loc = _loc_df_cdto(...)` trước khi gọi `tom_tat_kpi()`.
+- `services/cbtd_dia_ban_service.py` ~dòng 537 — `tom_tat_kpi()` đếm `so_to_tong` bằng unique `(đơn vị, xã, mã Tổ)` qua `_df_unique_theo_to(_them_cot_chuan_to(...))` thay vì `len(df)`; điểm TB và xếp loại tính trên tập đã dedupe, xếp loại được chuẩn hóa khoảng trắng/hoa thường trước khi đếm.
+- `tests/test_tab_cbtd_dashboard.py`, `tests/test_cbtd_dia_ban_review.py` — thêm regression cho chuỗi ưu tiên nguồn CDTOTKVV, fallback `ma_dv`/tiền tố xã, và chuẩn hóa `xep_loai`.
+- Kết quả: card `Tổng Tổ TK&VV` toàn CN 4.543 → 4.548 (khớp tab `🏘️ Xếp loại Tổ TK&VV`), lọc PGD/CBTD ra đúng số.
+
+## [2026-09-19] — Hoàn thiện baseline NQ11/GQVL và xác thực mốc 31/12
+- `snapshot_service.py` — `snapshot_la_cuoi_thang()` nhận cột ngày tùy chọn để tái sử dụng kiểm tra ngày cuối tháng cho snapshot ngoài HSTD.
+- `tabs/tab_so_sanh_ky/render_moc_nam.py` — chỉ đưa snapshot NQ11 vào danh sách mốc năm khi kỳ là tháng 12 và `ngay_bc` thực tế đúng ngày 31/12; kỳ `2026-12` mang ngày `12/05/2026` không còn được nhận nhầm là baseline.
+- `tabs/tab_baocao/reports/tong_hop_hstd_v2.py` — bỏ hoàn toàn fallback sang năm baseline mới nhất khi không xác định được năm mốc hoặc thiếu đúng năm cần so sánh.
+- `tests/test_snapshot_service.py`, `tests/test_tong_hop_hstd_v2.py`, `tests/test_tab_so_sanh_ky_moc_nam.py` — thêm regression cho cột ngày NQ11, trường hợp thiếu năm mốc và snapshot tháng 12 sai ngày.
+- Dữ liệu: tổng hợp baseline 2025 cho NQ11 (290.972 dòng nguồn) và GQVL (91.546 dòng nguồn), ghi mỗi bảng 23 dòng snapshot kỳ `2025-12`; xóa 13 dòng NQ11 kỳ sai `2026-12` sau khi sao lưu DB.
+
+## [2026-09-19] — Baseline 31/12: khóa đúng kỳ + bơm snapshot 2025-12
+- `snapshot_service.py` ~dòng 318 — `ky_baseline()` chỉ trả đúng kỳ `YYYY-12` của năm trước; thiếu kỳ thì trả `None`, KHÔNG fallback sang tháng 4/6/7.
+- `tabs/tab_baocao/reports/tong_hop_hstd_v2.py` ~dòng 640-660 — `_doc_baseline_cung_pham_vi()` nhận `nam_moc`, chọn baseline đúng năm theo ngày số liệu HSTD hiện tại thay vì lấy `max(ds_nam)`.
+- `tabs/tab_candoi.py` ~dòng 728/746/1706/1979 — tiêu đề cột chênh lệch động theo mốc so sánh người dùng chọn (`Tăng/giảm so với {label_prev}`) thay vì hardcode "năm trước".
+- DB: bơm 3 snapshot kỳ `2025-12` từ baseline 22/22 đơn vị — `hstd_snapshot` 405 dòng, `thon_snapshot` 1795 dòng, `uy_thac_snapshot` 7279 dòng (`created_by = codex_baseline_backfill`).
+- `tests/test_snapshot_service.py`, `tests/test_tong_hop_hstd_v2.py`, `tests/test_tab_candoi.py` — thêm regression cho 3 lỗi trên.
+
+## [2026-09-19] — Đổi tên hiển thị "Hội sở Chi nhánh tỉnh" → "Hội sở Chi nhánh thành phố"
+- Giữ nguyên key dữ liệu `DON_VI_CHI_NHANH = "Hội sở Chi nhánh tỉnh"` (khớp cột `Tên PGD` trong HSTD, dùng để lọc). Chỉ đổi chuỗi HIỂN THỊ ở UI/PDF/Word/Excel.
+- `tabs/tab_khtd_nhap.py` — nhãn `_PGD_XA_STT_CHUAN` + header PDF + replace → "Hội sở chi nhánh thành phố".
+- `tabs/tab_khtd_xuat.py` — tên sheet Excel "Hội sở CN tỉnh" → "Hội sở CN thành phố".
+- `tabs/tab_tien_do.py` — 9 chỗ "Hội sở CN tỉnh" (cột bảng, markdown, caption, text) → "Hội sở CN thành phố".
+- `tabs/tab_hhi.py` `_ten_don_vi_ngan()` — "Hội sở tỉnh" → "Hội sở thành phố"; cập nhật test `tests/test_tab_hhi.py`.
+- `tabs/tab_theo_doi_nhap/constants.py`, `tabs/tab_upload_khnv/_upload_toan_cn.py` — nhãn/hướng dẫn → "thành phố".
+- `services/khnv_lich_tuan_service.py`, `services/khtd_mau07_service.py`, `services/tien_do_excel_service.py` — "chi nhánh tỉnh"/"NHCSXH tỉnh"/"Hội sở CN tỉnh"/"BGĐ CN tỉnh" → "thành phố".
+
+## [2026-09-19] — Chuyển Quản lý Snapshot về Upload dữ liệu
+- `tabs/snapshot_management.py` — Tạo module UI quản lý snapshot dùng cho luồng Upload: danh sách snapshot, chạy lại kỳ hiện tại, bơm snapshot kỳ cũ, validate và xóa snapshot.
+- `tabs/tab_upload_khnv/__init__.py` — Thêm sub-tab `🧭 Snapshot kỳ` trong `Upload Dữ liệu — Phòng KH-NV`, gọi `render_snapshot_management(username)`.
+- `tabs/tab_so_sanh_ky/__init__.py` — Bỏ lựa chọn `🧭 Quản lý snapshot` khỏi màn `So sánh kỳ`, để tab này chỉ còn chức năng phân tích/so sánh.
+- `tests/test_tab_upload_toan_cn.py` — Thêm regression bảo vệ snapshot management nằm trong Upload và không còn trong So sánh kỳ.
+
+## [2026-09-19] — CBTD: hiện đúng cụm nợ cần quan tâm theo kỳ HSTD
+- `tabs/tab_cbtd.py` ~dòng 3332 — Tổng quan CBTD xác định kỳ HSTD hiện tại trước rồi truyền `yyyy=_nam, mm=_thang` vào `tong_hop_hstd_theo_cbtd()`, giúp bảng "Cụm chỉ tiêu nợ cần quan tâm" tính được món đến hạn trong tháng thay vì ra 0/trống.
+- `tests/test_tab_cbtd_add_form.py` ~dòng 60 — Thêm regression bảo vệ call-site UI luôn truyền kỳ hiện tại cho service tổng hợp CBTD.
+- `tests/test_cbtd_dia_ban_review.py` ~dòng 139 — Bổ sung dữ liệu ngày đến hạn/gốc đến hạn vào test service để kiểm CBTD có món đến hạn trong kỳ được cộng đúng.
+- `BUGMAP.md` — Thêm `B104`.
+
+## [2026-09-14] — Chuẩn hóa số liệu Điểm GD: khử trùng khế ước và loại đúng NOXH trực tiếp
+- `services/cbtd_dia_ban_service.py` ~dòng 99-145 — Thêm `mask_noxh_truc_tiep()` và `chuan_bi_hstd_bao_cao_dgd()`: chỉ tính dòng dư nợ dương, bỏ dòng thiếu `Số khế ước`, khử trùng cùng `Số khế ước`, loại riêng NOXH/NĐ100 vay trực tiếp thay vì loại toàn bộ `Hình thức vay = 1`.
+- `services/cbtd_dia_ban_service.py` ~dòng 744/930/1150/1453/1543 — Các bảng/KPI CBTD, snapshot thôn, bảng CBTD × xã × chương trình và Top 3 việc ưu tiên dùng cùng chuẩn Điểm GD trước khi cộng số liệu.
+- `tabs/tab_bao_cao_giao_ban_pgd.py` ~dòng 228 — Làm sạch `df_dgd` theo chuẩn Điểm GD trước khi tổng hợp theo ĐVUT/KPI/biểu đồ/xuất file.
+- `tabs/tab_cbtd.py` ~dòng 1664/2375 — Hồ sơ năng lực CBTD và bảng tổng hợp dư nợ CBTD dùng dữ liệu đã khử trùng; dòng NOXH trực tiếp chuyển thành đối chiếu riêng, không tính vào TỔNG CỘNG Điểm GD.
+- `tests/test_cbtd_dia_ban_review.py` ~dòng 226 — Thêm regression cho dòng trùng `Số khế ước`, dòng thiếu khế ước, dòng dư nợ 0, NOXH trực tiếp và khoản trực tiếp không phải NOXH.
+- `BUGMAP.md` — Thêm `C62`.
+
 ## [2026-09-13] — Dashboard CBTD & Địa bàn: bỏ báo cáo "quá tải/thiếu tải" CBTD
 - `services/cbtd_dia_ban_service.py` — Xóa hẳn `danh_gia_workload_cbtd()`; bỏ 3 hằng số ngưỡng `_NGUONG_DGD_QUA_TAI`/`_NGUONG_AP_QUA_TAI`/`_NGUONG_DGD_THIEU_TAI`; `canh_bao_cbtd_dia_ban()` bỏ nhánh sinh cảnh báo `cbtd_quatai`/`cbtd_thieutai` (và 3 tham số ngưỡng tương ứng); `tom_tat_kpi()` bỏ 2 trường `so_cbtd_quatai`/`so_cbtd_thieutai`.
 - `tabs/tab_cbtd_dashboard.py` — Bỏ 2 KPI card "CBTD quá tải"/"CBTD thiếu tải"; bỏ cột "Workload" trong bảng pivot (thay `so_ap` bằng `_count_ap()`); bỏ `cbtd_quatai`/`cbtd_thieutai` khỏi 4 map `_TEN_LOAI_CB`/`_MUC_DO_LOAI_CB`/`_TEN_SHEET_CB`/`_COT_CHI_TIET_CB`; PDF xếp hạng bỏ 2 cột "Quá tải"/"Thiếu tải"; sửa `kpi_for_pdf` dùng `len(df_xep_hang)` (trước đây tham chiếu biến `tong_cbtd`/`so_quatai`/`so_thieutai` không tồn tại → bấm nút PDF sẽ NameError).

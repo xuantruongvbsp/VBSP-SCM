@@ -3,12 +3,13 @@ Tab Upload KH-NV — Phòng Kế hoạch Nghiệp vụ.
 ────────────────────────────────────────────
 Quyền: role in ("admin", "manager", "admin_cn", "manager_cn")
 
-Cấu trúc 6 sub-tabs:
+Cấu trúc 7 sub-tabs:
   📊 Tổng quan & Merge  — bảng trạng thái + pending queue + nút Merge thủ công
   📤 Upload đơn vị      — form upload 4 file cho 1 đơn vị
   📦 Import hàng loạt   — multi-file bulk import
   🏢 Toàn Chi nhánh     — CDTOTKVV / NQ11 / GQVL toàn CN
   📅 Mốc 31/12          — upload file baseline
+  🧭 Snapshot kỳ        — chạy lại / bơm snapshot kỳ cũ
   🗑️ Xóa dữ liệu        — xóa file + rebuild cache
 
 Flow batch merge:
@@ -25,8 +26,9 @@ from utils import lazy_tabs
 
 from . import _status_board, _merge_panel, _baseline, _delete
 from ._upload_don_vi import render_upload_don_vi, render_import_hang_loat
-from ._upload_toan_cn import render_cdto_toan_cn, render_nq11_toan_cn, render_gqvl_toan_cn
+from ._upload_toan_cn import render_cdto_toan_cn, render_nq11_toan_cn, render_gqvl_toan_cn, render_hstd_toan_cn
 from ._state import xoa_cache_trang_thai
+from tabs.snapshot_management import render_snapshot_management
 
 
 def render(tab=None, **kwargs) -> None:
@@ -95,8 +97,9 @@ def render(tab=None, **kwargs) -> None:
         def _render_toan_chi_nhanh(_tab=None) -> None:
             st.markdown("#### 🏢 Upload dữ liệu Toàn Chi nhánh")
             lazy_tabs(
-                ["🏆 CDTOTKVV toàn CN", "📑 Danh sách mã KU NQ11", "📋 GQVL toàn CN"],
+                ["📊 HSTD toàn CN", "🏆 CDTOTKVV toàn CN", "📑 Danh sách mã KU NQ11", "📋 GQVL toàn CN"],
                 [
+                    lambda c: render_hstd_toan_cn(username),
                     lambda c: render_cdto_toan_cn(username),
                     lambda c: render_nq11_toan_cn(username),
                     lambda c: render_gqvl_toan_cn(username, df_full),
@@ -106,6 +109,9 @@ def render(tab=None, **kwargs) -> None:
 
         def _render_baseline(_tab=None) -> None:
             _baseline.render(username)
+
+        def _render_snapshot(_tab=None) -> None:
+            render_snapshot_management(username)
 
         def _render_xoa_du_lieu(_tab=None) -> None:
             st.markdown("#### 🗑️ Xóa dữ liệu PGD")
@@ -118,6 +124,7 @@ def render(tab=None, **kwargs) -> None:
                 "📦 Import hàng loạt",
                 "🏢 Toàn Chi nhánh",
                 "📅 Mốc 31/12",
+                "🧭 Snapshot kỳ",
                 "🗑️ Xóa dữ liệu",
             ],
             [
@@ -126,6 +133,7 @@ def render(tab=None, **kwargs) -> None:
                 _render_import_hang_loat,
                 _render_toan_chi_nhanh,
                 _render_baseline,
+                _render_snapshot,
                 _render_xoa_du_lieu,
             ],
             key="khnv_upload",

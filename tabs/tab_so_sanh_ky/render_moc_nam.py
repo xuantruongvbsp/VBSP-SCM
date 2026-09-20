@@ -30,6 +30,7 @@ from snapshot_service import (
     doc_nq11_snapshot, danh_sach_ky_nq11, luu_nq11_snapshot,
     doc_gqvl_snapshot, danh_sach_ky_gqvl,
     doc_cdtotkvv_snapshot, danh_sach_ky_cdtotkvv,
+    snapshot_la_cuoi_thang,
 )
 from services.so_sanh_ky_service import (
     agg_mot_pgd as _agg_mot_pgd,
@@ -682,6 +683,17 @@ def _render_hstd_section(
 # NQ11 SECTION
 # ═══════════════════════════════════════════════════════════════════════════
 
+def _la_moc_nq11_cuoi_nam(ky: str) -> bool:
+    """Chỉ nhận snapshot NQ11 có ngày báo cáo đúng 31/12 của chính kỳ."""
+    if not str(ky).endswith("-12"):
+        return False
+    return snapshot_la_cuoi_thang(
+        doc_nq11_snapshot(ky),
+        ky,
+        cot_ngay="ngay_bc",
+    )
+
+
 def _render_nq11_section(
     role: str,
     pgd_user: str | None,
@@ -697,8 +709,8 @@ def _render_nq11_section(
             _render_nq11_manual_snap(df_nq11, key_prefix)
         return
 
-    # Ưu tiên kỳ tháng 12 làm mốc — nếu không có thì dùng tất cả kỳ
-    ds_nam_12 = sorted([k for k in ds_ky if k.endswith("-12")], reverse=True)
+    # Chỉ nhận mốc có ngày báo cáo thật sự là 31/12, không suy từ tên kỳ.
+    ds_nam_12 = sorted([k for k in ds_ky if _la_moc_nq11_cuoi_nam(k)], reverse=True)
     co_thang_12 = bool(ds_nam_12)
     if not co_thang_12:
         st.caption("ℹ️ Chưa có snapshot tháng 12 — hiển thị tất cả kỳ có sẵn.")

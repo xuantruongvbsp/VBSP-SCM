@@ -142,6 +142,26 @@
 | **Fix** | Bỏ cache khỏi `ts_baseline_merged()`. Hàm này chỉ `stat` ~22 file nên rất nhẹ, và cần luôn phản ánh `mtime` mới nhất của cache parquet/file baseline |
 | **Ngày fix** | 2026-07-03 |
 
+### A4j — Baseline 31/12 bị thay bằng snapshot tháng khác (fallback sai kỳ)
+| | |
+|---|---|
+| **File** | `snapshot_service.py` → `ky_baseline()`; `tabs/tab_baocao/reports/tong_hop_hstd_v2.py` → `_doc_baseline_cung_pham_vi()`; `tabs/tab_candoi.py` |
+| **Dấu hiệu** | Mốc 31/12/2025 hiển thị số của kỳ `2026-04`/`2026-06`/`2026-07` khi thiếu snapshot `2025-12`; tiêu đề chênh lệch vẫn ghi "so với năm trước" dù người dùng chọn mốc khác |
+| **Nguyên nhân** | `ky_baseline()` fallback sang kỳ bất kỳ có sẵn khi không tìm thấy `YYYY-12`; `_doc_baseline_cung_pham_vi()` lấy `max(ds_nam)` thay vì năm baseline ứng với ngày số liệu HSTD; `tab_candoi.py` hardcode nhãn "năm trước" |
+| **Fix** | `ky_baseline()` chỉ trả đúng `YYYY-12`, thiếu thì trả `None` (UI hiện `—`, không thay thế); truyền `nam_moc = ngay_hien_tai.year - 1` vào `_doc_baseline_cung_pham_vi()`; nhãn cột chênh lệch động theo mốc so sánh. Bơm lại 3 snapshot kỳ `2025-12` (hstd/thôn/ủy thác) từ baseline 22/22 đơn vị |
+| **Test** | `tests/test_snapshot_service.py`; `tests/test_tong_hop_hstd_v2.py`; `tests/test_tab_candoi.py` |
+| **Ngày fix** | 2026-09-19 |
+
+### A4k — Snapshot NQ11 có hậu tố tháng 12 nhưng ngày báo cáo không phải 31/12
+| | |
+|---|---|
+| **File** | `snapshot_service.py` → `snapshot_la_cuoi_thang()`; `tabs/tab_so_sanh_ky/render_moc_nam.py` → `_la_moc_nq11_cuoi_nam()` |
+| **Dấu hiệu** | Mục So sánh mốc năm nhận kỳ `2026-12` làm baseline dù 13 dòng NQ11 trong kỳ đều có `ngay_bc = 12/05/2026` |
+| **Nguyên nhân** | Danh sách mốc năm chỉ kiểm tra chuỗi kỳ kết thúc bằng `-12`, không đối chiếu ngày báo cáo thực tế trong snapshot NQ11 |
+| **Fix** | Bổ sung kiểm tra ngày cuối tháng theo cột tùy chọn; NQ11 chỉ được coi là mốc cuối năm khi kỳ là tháng 12 và mọi `ngay_bc` đều đúng ngày cuối tháng. Tổng hợp lại baseline NQ11/GQVL kỳ `2025-12`, sau đó xóa kỳ NQ11 `2026-12` sai dữ liệu bằng hàm snapshot chuẩn có audit |
+| **Test** | `tests/test_snapshot_service.py`; `tests/test_tab_so_sanh_ky_moc_nam.py`; `tests/test_tong_hop_hstd_v2.py` |
+| **Ngày fix** | 2026-09-19 |
+
 ### A5 — DuckDB `Binder Error: Referenced column not found in FROM clause`
 | | |
 |---|---|
@@ -212,6 +232,29 @@
 ---
 
 ## B. Streamlit UI
+
+### B105 — Bơm snapshot kỳ cũ giữ nguyên file cũ trong ô upload sau khi bơm xong
+| | |
+|---|---|
+| **File** | `tabs/snapshot_management.py` → `_render_bom_snapshot_ky_cu()` |
+| **Dấu hiệu** | Màn `🧭 Snapshot kỳ → Bơm snapshot kỳ cũ`, chế độ "Upload file": sau khi bấm bơm xong, ô `st.file_uploader` vẫn hiện file cũ; muốn upload lần 2 phải bấm "×" thủ công từng file. |
+| **Nguyên nhân** | `st.file_uploader` dùng key cố định `ql_snap_bom_files`, không có version-key để reset widget sau khi xử lý; sau `st.rerun()` file vẫn nằm trong session state. |
+| **Fix** | Thêm `_upload_ver = st.session_state.setdefault("ql_snap_bom_upload_ver", 0)`, đổi key uploader thành `f"ql_snap_bom_files_{_upload_ver}"`, tăng `_upload_ver` trước `st.rerun()` ở cả nhánh HSTD và CDTOTKVV (khớp pattern tab Upload chính). |
+| **Ngày fix** | 2026-09-19 |
+
+---
+
+### B104 — Tổng quan CBTD không hiện món đến hạn trong "Cụm chỉ tiêu nợ cần quan tâm"
+| | |
+|---|---|
+| **File** | `tabs/tab_cbtd.py` → khối "Tổng quan theo CBTD" ~dòng 3332 |
+| **Dấu hiệu** | Vào `👔 CBTD & Địa bàn` → `📊 Tổng quan theo CBTD`, bảng "Dư nợ theo CBTD quản lý địa bàn" có thể hiện nhưng bảng "Cụm chỉ tiêu nợ cần quan tâm (món)" không có/không đúng chỉ tiêu "Món đến hạn" dù HSTD có ngày đến hạn trong kỳ. |
+| **Nguyên nhân** | UI gọi `tong_hop_hstd_theo_cbtd(cbtd_data, dgd_map, df)` không truyền `yyyy/mm`; trong service, `No_den_han_mon` và `No_den_han_goc` chỉ được tính khi biết kỳ tháng/năm nên rơi về 0. |
+| **Fix** | Xác định kỳ HSTD hiện tại bằng `_ky_hstd_hien_tai(df)` trước khi gọi service và truyền `yyyy=_nam, mm=_thang`; thêm regression bảo vệ call-site và test service có món đến hạn tháng hiện tại. |
+| **Test** | `tests/test_tab_cbtd_add_form.py::test_tong_quan_cbtd_truyen_ky_hien_tai_cho_service`; `tests/test_cbtd_dia_ban_review.py::test_tong_hop_hstd_theo_cbtd_cong_so_lieu_tung_can_bo` |
+| **Ngày fix** | 2026-09-19 |
+
+---
 
 ### B103 — Bảng "📊 Dư nợ theo CBTD quản lý địa bàn" bị cắt mất cột mép phải (17 cột)
 | | |
@@ -1566,6 +1609,26 @@
 | **Fix** | Ghi vào file tạm cùng thư mục rồi `os.replace()` nguyên tử; serialize writer trong process, bỏ qua payload đã trùng, retry replace 5 lần và luôn dọn file tạm. Tab Cân đối đổi version key uploader sau thành công để chặn upload lặp |
 | **Test** | `tests/test_upload_service.py::TestGhiVaXoaCache`, `tests/test_tab_candoi.py::test_upload_dienbao_reset_uploader_sau_khi_luu_thanh_cong` |
 | **Ngày fix** | 2026-07-31 |
+
+### E26 — Bảng 🏅 Chất lượng Tổ TK&VV và snapshot bị trộn kỳ HSTD/CDTOTKVV
+| | |
+|---|---|
+| **File** | `tabs/tab_cbtd.py` → `_bang_to_tkvv()`; `services/upload_service.py`; `snapshot_service.py`; `tabs/snapshot_management.py` |
+| **Dấu hiệu** | Bảng "🏅 Chất lượng Tổ TK&VV" đọc nguồn hiện tại cũ; cột Δ có thể so mốc HSTD thay vì kỳ chấm điểm. DB từng có snapshot CDTOTKVV `2026-09` dù nguồn mới nhất là `08/2026`; kỳ giả có 0 Tổ Trung bình trong khi `08/2026` có 12. |
+| **Nguyên nhân** | UI cũ đọc `cdtotkvv_latest.xlsx`; sau khi đổi nguồn hiện tại, hai mốc Δ vẫn được truyền từ HSTD. Đồng thời merge/chạy lại HSTD lấy `cdtotkvv_latest.xlsx` rồi gắn nhãn bằng kỳ HSTD, tạo snapshot sai kỳ. Writer CDTOTKVV dùng upsert nên chạy lại nguồn thiếu còn có thể giữ đơn vị cũ; hàm đọc theo tháng cache chỉ bằng `MM/YYYY` nên upload lại cùng kỳ có nguy cơ snapshot nội dung cũ. |
+| **Fix** | UI dùng `load_cdto_toan_cn()` và tự suy ra tháng trước/31-12 từ `thang_hien`; thiếu snapshot đúng kỳ thì Δ là `None`. Snapshot CDTOTKVV chỉ được tạo từ upload CDTOTKVV đúng kỳ và đủ 22 đơn vị, đồng thời xóa cache đọc kỳ trước khi tổng hợp; bỏ trigger khỏi HSTD; writer thay trọn kỳ. Thêm xóa riêng hai bảng CDTOTKVV để loại kỳ giả mà không chạm HSTD/Thôn/Ủy thác. Đã tái tạo 5 kỳ lịch sử đủ nguồn và xóa `2026-09` sai. |
+| **Test** | `tests/test_tab_cbtd_add_form.py`; `tests/test_bom_snapshot_ky_cu.py`; `tests/test_cdtotkvv_history.py`; `tests/test_snapshot_service.py`; `tests/test_merge_du_lieu_toan_cn.py` |
+| **Ngày fix** | 2026-09-20 |
+
+### E27 — Upload HSTD toàn Chi nhánh cho phép ghi thiếu và trộn file cũ/mới
+| | |
+|---|---|
+| **File** | `services/upload_service.py` → `tach_file_hstd_toan_cn()`, `xu_ly_hstd_toan_cn()`; `tabs/tab_upload_khnv/_upload_toan_cn.py` |
+| **Dấu hiệu** | File gộp thiếu hoặc lệch tên một đơn vị vẫn cho bấm Upload; các đơn vị nhận diện được bị ghi trước rồi đưa HSTD vào hàng chờ merge. Nếu một lần ghi lỗi giữa chừng, bộ nguồn KH-NV có thể gồm cả file mới và file cũ. |
+| **Nguyên nhân** | Parser bỏ qua tên ngoài danh mục; UI chỉ cảnh báo thiếu; service ghi tuần tự từng đơn vị mà không kiểm tra đủ 22 và không rollback. Uploader còn cho chọn `.xls` dù parser bắt buộc `openpyxl`. |
+| **Fix** | Chuẩn hóa alias tên đơn vị và báo tên lạ; chặn ghi nếu không đúng đủ 22 đơn vị; sao lưu rồi ghi nguyên tử từng file, lỗi bất kỳ thì khôi phục cả bộ; UI khóa nút khi thiếu, chỉ queue merge sau 22/22 và chỉ nhận `.xlsx`. |
+| **Test** | `tests/test_hstd_toan_cn.py` |
+| **Ngày fix** | 2026-09-20 |
 
 ---
 
@@ -3046,6 +3109,16 @@ val = pd.to_numeric(df[COT_X], errors="coerce").sum() if COT_X in df.columns els
 | **Fix** | Thêm `loc_ho_so_con_du_no()` lọc theo `Tổng dư nợ > 0 OR Dư nợ quá hạn > 0 OR Dư nợ khoanh > 0`; dùng trong KPI service và đầu `tab_tongquan.render()` |
 | **Test** | `tests/test_tongquan_service.py::test_tinh_kpi_tongquan_bo_qua_ho_so_du_no_0_khi_dem` |
 | **Ngày fix** | 2026-07-10 |
+
+### C31 — Dashboard CBTD & Địa bàn: metric `Tổng Tổ TK&VV` sai do lệch nguồn + không dedupe + không lọc theo bộ lọc
+| | |
+|---|---|
+| **File** | `tabs/tab_cbtd_dashboard.py` → `_doc_cdtotkvv_moi_nhat()`, `_loc_df_cdto()`; `services/cbtd_dia_ban_service.py` → `tom_tat_kpi()` |
+| **Dấu hiệu** | `▶ 👔 CBTD & Địa bàn` → `📊 Dashboard CBTD & Địa bàn` card `Tổng Tổ TK&VV` hiện `4.543` trong khi tab `🏘️ Xếp loại Tổ TK&VV` cùng kỳ hiện `4.548`; khi lọc 1 PGD/1 CBTD card vẫn giữ số toàn Chi nhánh |
+| **Nguyên nhân** | (1) `_doc_cdtotkvv_moi_nhat()` đọc `pgd_data/{slug}/cdtotkvv_latest.xlsx` (nguồn "latest" cũ, 15/22 đơn vị lệch phiên bản) thay vì nguồn trung tâm `data/cdtotkvv/`; (2) `tom_tat_kpi()` đếm `len(df_cdtotkvv)` nên tính cả dòng trùng `(đơn vị, xã, mã Tổ)`; (3) `df_cdtotkvv` không lọc theo `loc_pgd`/`loc_cb` trước khi tính KPI; (4) khi chọn riêng CBTD nhưng PGD còn `(Tất cả)`, chỉ lọc theo tên xã nên có thể lẫn Tổ của PGD khác có cùng tên xã |
+| **Fix** | (1) Ưu tiên `load_cdto_toan_cn()["df_raw"]` (nguồn trung tâm theo kỳ, đã dedupe), chỉ fallback `tong_hop_tu_pgd_data()`; (2) đếm unique qua `_df_unique_theo_to(_them_cot_chuan_to(df))`, chuẩn hóa `xep_loai` trước khi tính đạt/TB-yếu; (3) thêm `_loc_df_cdto()` lọc theo PGD (khớp `ten_dv` hoặc `ma_dv`) và theo CBTD (khóa theo PGD của CBTD trước, sau đó khớp `ten_xa` trong địa bàn ĐGD, bỏ qua tiền tố `Xã/Phường/Thị trấn`) trước khi tính KPI; (4) mini dashboard PGD dùng cùng nguồn trung tâm |
+| **Test** | `tests/test_tab_cbtd_dashboard.py::test_doc_cdtotkvv_moi_nhat_uu_tien_nguon_trung_tam`; `tests/test_tab_cbtd_dashboard.py::test_doc_cdtotkvv_moi_nhat_fallback_khi_nguon_trung_tam_rong`; `tests/test_tab_cbtd_dashboard.py::test_loc_df_cdto_khop_pgd_bang_ma_dv_va_xa_co_tien_to`; `tests/test_tab_cbtd_dashboard.py::test_loc_df_cdto_chon_cbtd_khoa_theo_pgd_truoc_khi_loc_xa`; `tests/test_cbtd_dia_ban_review.py::test_tom_tat_kpi_dem_unique_va_chuan_hoa_xep_loai` |
+| **Ngày fix** | 2026-09-20 |
 
 ---
 
@@ -4795,6 +4868,42 @@ def _to_int(val, default=0):
 | **Fix** | (1) Đổi regex thành `^[^\s/\\:*?"<>|]{2,30}$` — nhập tự do, chỉ chặn khoảng trắng + ký tự không an toàn cho tên file (mã CBTD được đưa vào `file_name=f"CBTD_{chon}_..._HoSoNangLuc.pdf"` dòng ~1869). Cập nhật message lỗi, `help`/`placeholder` của 2 form. Giữ nguyên `.strip().upper()` ở call site để dedup key nhất quán, giữ `_auto_gen_ma_cb()` làm mặc định khi để trống. (2) `_pgd_slug_ma()` đổi sang `re.sub(r"\W+", "_", ...)` (Unicode-aware) → `"NGUYỄN VĂN A"` → `"NGUYỄN_VĂN_A"`, hết trùng. |
 | **Test** | `_validate_ma_cb`: `01`, `NGUYEN_VAN_A`, `CB_BIEN_HOA_001`, `BÌNH`, `A-B_01`, `0112345678`, `"  02  "` → **ok**; `CO DAU`, `A/B`, `A`, 31 ký tự, `A<B>C`, `D:E*F?G`, `""` → **reject** đúng message. Check trùng: `01` vs `{"01":...}` → reject; `bo_qua_ma` vẫn hoạt động. `_pgd_slug_ma`: `NGUYỄN VĂN A`→`NGUYỄN_VĂN_A`, `TRẦN THỊ B`→`TRẦN_THỊ_B`, `Hội sở Chi nhánh tỉnh`→`HỘI_SỞ_CHI_NHÁNH_TỈNH`, `01`→`01` (đều độc nhất). Compile ✅. |
 | **Ngày fix** | 2026-09-13 |
+
+---
+
+### C62 — Số liệu Điểm GD lệch PDF do HSTD trùng `Số khế ước` và lọc nhầm toàn bộ `HTV=1`
+| | |
+|---|---|
+| **File** | `services/cbtd_dia_ban_service.py` → `chuan_bi_hstd_bao_cao_dgd()` ~dòng 118; `tabs/tab_bao_cao_giao_ban_pgd.py` ~dòng 228; `tabs/tab_cbtd.py` ~dòng 2375 |
+| **Dấu hiệu** | Đối chiếu PDF Tam Hiệp 31/08/2026: HSTD thô theo `dgd_map` ra 115,793 tỷ; sau loại NOXH trực tiếp còn lệch +100 triệu ở Tân Mai/Khu phố 11. |
+| **Nguyên nhân** | HSTD có 1 món vay bị lặp y hệt (`Lê Thị Kim Lan`, `Số khế ước=6600000733899603`, dư nợ 100 triệu). Đồng thời code cũ loại toàn bộ `Hình thức vay = 1`, trong khi PDF Điểm GD vẫn tính một số khoản trực tiếp không phải NOXH; chỉ NOXH/NĐ100 trực tiếp mới cần loại khỏi báo cáo Điểm GD. |
+| **Fix** | Thêm helper chuẩn Điểm GD: chỉ giữ dòng dư nợ dương, bỏ dòng thiếu `Số khế ước`, khử trùng theo `Số khế ước`, loại riêng `HTV=1` + chương trình NOXH/NĐ100/CVNHA. Áp dụng cho tab Giao ban PGD, các tổng hợp/KPI CBTD và bảng CBTD × xã × chương trình. |
+| **Test** | `tests/test_cbtd_dia_ban_review.py::test_chuan_bi_hstd_bao_cao_dgd_khu_trung_va_chi_loai_noxh_truc_tiep`; đối chiếu thực tế Tam Hiệp: Bình Đa, Tam Hiệp, Tân Mai, Tân Hiệp 3 và Tổng cộng đều lệch 0 so với PDF. |
+| **Ngày fix** | 2026-09-14 |
+
+---
+
+### C63 — Dư nợ CBTD tăng/giảm so tháng trước/năm trước bị phóng đại do mã thôn cũ sau sáp nhập
+| | |
+|---|---|
+| **File** | `data/khtd.py` → `gan_cbtd_vao_df()`; `services/cbtd_dia_ban_service.py` → `tong_hop_thon_snapshot_theo_cbtd()`; `tabs/tab_cbtd.py` → bảng "Dư nợ theo CBTD quản lý địa bàn" |
+| **Dấu hiệu** | `▶ 👔 CBTD & Địa bàn` → `Dư nợ theo CBTD quản lý địa bàn (triệu đồng)` hiển thị "Dư nợ tăng/giảm" so tháng trước/năm trước sai lớn. Dữ liệu thật: kỳ `2026-08` Hội sở ~677,43 tỷ nhưng kỳ `2026-07` sau gán CBTD chỉ ~336,38 tỷ, làm delta nhảy giả +341 tỷ. |
+| **Nguyên nhân** | `thon_snapshot` kỳ cũ còn nhiều mã thôn/xã trước sáp nhập như `46005605`, `46006603`, `46006741`; tên thôn có thể trống hoặc khác chuẩn. `gan_cbtd_vao_df()` chỉ gán bằng `(PGD, Mã thôn)` hiện tại rồi fallback `(PGD, Xã, Thôn)`, nên các dòng lịch sử có mã cũ và tên thôn trống bị rơi khỏi kỳ so sánh. |
+| **Fix** | Thêm công tắc `fallback_xa_dgd=False` cho `gan_cbtd_vao_df()` và chỉ bật trong `tong_hop_thon_snapshot_theo_cbtd()` khi đọc snapshot thôn kỳ cũ. Fallback lịch sử dùng `(PGD, Tên xã)` khi tên xã trùng chính xác tên Điểm GD hiện tại trong cùng PGD và khóa đó chỉ thuộc một CBTD. Kỳ `2026-07` gán lại đủ ~681,42 tỷ; kỳ `2026-08` giữ ~677,43 tỷ. |
+| **Test** | `tests/test_cbtd_dia_ban_review.py::test_snapshot_thon_cu_ma_thon_cu_fallback_theo_xa_trung_ten_dgd`; `test_snapshot_thon_cu_khong_fallback_khi_dgd_thuoc_nhieu_cbtd`; `test_fallback_snapshot_ap_dung_cho_delta_thang_truoc_va_3112`; `test_gan_cbtd_mac_dinh_khong_fallback_xa_dgd_de_tranh_anh_huong_man_live` |
+| **Ngày fix** | 2026-09-19 |
+
+---
+
+### J91 — Bơm thiếu đơn vị xóa trọn snapshot kỳ cũ; BCQUERY 174 cột làm mất Ủy thác
+| | |
+|---|---|
+| **File** | `services/upload_service.py` → `bom_snapshot_ky_cu()`; `tabs/snapshot_management.py` → `_render_bom_snapshot_ky_cu()`; `snapshot_service.py` → `luu_uy_thac_snapshot()`, `_bo_sung_uy_thac_tu_ma_to()` |
+| **Dấu hiệu** | Bơm bổ sung riêng Long Khánh/Bình Long làm kỳ `2026-07` từ 20 đơn vị chỉ còn 2 đơn vị do writer thay trọn kỳ. Sau khi bơm đủ 22, snapshot Ủy thác vẫn chỉ có 2 PGD/356 dòng vì 20 file BCQUERY mẫu 174 cột để trống `Tên ĐVUT` và `Tên tổ`. |
+| **Nguyên nhân** | UI cho chạy khi thiếu đơn vị và dùng `dict[ten_dv] = data` nên file trùng âm thầm ghi đè. Service vẫn gọi ba writer dù một số file đọc lỗi/sai ngày. Writer Ủy thác chỉ lọc theo `Tên ĐVUT`, chưa dùng fallback `Mã PGD + Mã tổ` đã có trong CDTOTKVV, đồng thời dùng upsert nên có thể giữ dòng cũ không còn trong nguồn. |
+| **Fix** | Chặn trước khi ghi nếu không đúng đủ 22 đơn vị, có lỗi đọc hoặc ngày không phải cuối kỳ; UI xử lý file trùng rõ ràng và xác nhận thay kỳ. Ủy thác bù Hội/Tổ qua `ban_do_ma_to_dvut()`, rồi `DELETE WHERE ky=?` + insert trong cùng transaction. Khôi phục DB từ staging sạch: HSTD 412 dòng/22 đơn vị, Thôn 974/22, Ủy thác 4.751 dòng/22 PGD. |
+| **Test** | `tests/test_bom_snapshot_ky_cu.py`; `tests/test_snapshot_service.py::TestUyThacSnapshot`; `tests/test_bq_hoi_fallback.py` → 92 passed. Đối chiếu production: 370.282 hồ sơ nguồn, mọi snapshot ngày `31/07/2026`, DB integrity `ok`. |
+| **Ngày fix** | 2026-09-19 |
 
 ---
 

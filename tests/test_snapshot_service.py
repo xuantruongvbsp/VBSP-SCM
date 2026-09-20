@@ -258,6 +258,19 @@ class TestKyThangTruoc:
         assert svc.ky_thang_truoc(["2026-05"], "2026-05") is None
 
 
+class TestKyBaseline:
+    def test_chi_nhan_dung_thang_12_nam_truoc(self):
+        ds = ["2026-08", "2025-12", "2025-11"]
+        assert svc.ky_baseline(ds, "2026-08") == "2025-12"
+
+    def test_thieu_thang_12_khong_fallback_sang_ky_khac(self):
+        ds = ["2026-08", "2026-07", "2026-04"]
+        assert svc.ky_baseline(ds, "2026-08") is None
+
+    def test_ky_hien_tai_khong_hop_le_tra_none(self):
+        assert svc.ky_baseline(["2025-12"], "abc") is None
+
+
 class TestNgayCuoiThang:
     def test_thang_31_ngay(self):
         assert svc.ngay_cuoi_thang("2026-03") == "31/03/2026"
@@ -298,6 +311,12 @@ class TestNgayCuoiThang:
         df_sai = pd.DataFrame({"ngay_so_lieu": ["29/04/2026"]})
         assert svc.snapshot_la_cuoi_thang(df_ok, "2026-04") is True
         assert svc.snapshot_la_cuoi_thang(df_sai, "2026-04") is False
+
+    def test_snapshot_la_cuoi_thang_ho_tro_cot_ngay_nq11(self):
+        df_ok = pd.DataFrame({"ngay_bc": ["31/12/2025", "31/12/2025"]})
+        df_sai = pd.DataFrame({"ngay_bc": ["12/05/2026"]})
+        assert svc.snapshot_la_cuoi_thang(df_ok, "2025-12", cot_ngay="ngay_bc") is True
+        assert svc.snapshot_la_cuoi_thang(df_sai, "2026-12", cot_ngay="ngay_bc") is False
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -475,6 +494,44 @@ class TestUyThacSnapshot:
             "SELECT COUNT(*) FROM uy_thac_snapshot WHERE ky='2026-03' AND cap_tong_hop='CN'"
         ).fetchone()[0]
         assert count == 1
+
+    def test_luu_lai_cung_ky_xoa_dong_uy_thac_khong_con(self, df_hstd_gias, db_memory):
+        svc.luu_uy_thac_snapshot(df_hstd_gias, "u1")
+        df_moi = df_hstd_gias[df_hstd_gias["Tên PGD"] == "PGD Biên Hòa"].copy()
+
+        kq = svc.luu_uy_thac_snapshot(df_moi, "u2")
+
+        assert kq.thanh_cong is True
+        count_long_khanh = db_memory.execute(
+            "SELECT COUNT(*) FROM uy_thac_snapshot WHERE ky='2026-03' AND ten_pgd='PGD Long Khánh'"
+        ).fetchone()[0]
+        assert count_long_khanh == 0
+
+    def test_luu_uy_thac_suy_ra_ten_hoi_va_to_tu_ma_to(self, df_hstd_gias, db_memory):
+        df = df_hstd_gias.iloc[[0]].copy()
+        df["Tên ĐVUT"] = pd.NA
+        df["Tên tổ"] = pd.NA
+        df["Mã PGD"] = "004601"
+        df["Mã tổ"] = "000123"
+
+        with patch(
+            "data.cdtotkvv.ban_do_ma_to_dvut",
+            return_value={"4601|123": "11", "123": "14"},
+        ):
+            kq = svc.luu_uy_thac_snapshot(df, "tester")
+
+        assert kq.thanh_cong is True
+        row_hoi = db_memory.execute(
+            """SELECT dvut FROM uy_thac_snapshot
+                WHERE ky='2026-03' AND cap_tong_hop='HOI' AND ten_pgd='PGD Biên Hòa'"""
+        ).fetchone()
+        row_to = db_memory.execute(
+            """SELECT dvut, ten_to FROM uy_thac_snapshot
+                WHERE ky='2026-03' AND cap_tong_hop='TO'"""
+        ).fetchone()
+        assert row_hoi["dvut"] == "Hội nông dân"
+        assert row_to["dvut"] == "Hội nông dân"
+        assert row_to["ten_to"] == "Tổ 123"
 
     def test_doc_theo_pgd(self, df_hstd_gias, db_memory):
         svc.luu_uy_thac_snapshot(df_hstd_gias, "tester")
@@ -804,6 +861,34 @@ class TestCbtdToTkvvSnapshot:
         assert doc.loc[0, "so_to"] == 2
         assert doc.loc[0, "so_tot"] == 1
         assert doc.loc[0, "so_kha"] == 1
+
+    def test_xoa_cdtotkvv_snapshot_ky_khong_dung_bang_hstd(self, db_memory):
+        db_memory.execute(
+            "INSERT INTO cdtotkvv_snapshot (ky, ten_pgd) VALUES (?, ?)",
+            ("2026-09", "__CN__"),
+        )
+        db_memory.execute(
+            "INSERT INTO cbtd_to_tkvv_snapshot (ky, ma_cb) VALUES (?, ?)",
+            ("2026-09", "CB01"),
+        )
+        db_memory.execute(
+            "INSERT INTO hstd_snapshot (ky, ten_pgd, ma_ct, nguon_von) VALUES (?, ?, ?, ?)",
+            ("2026-09", "__CN__", "ALL", "ALL"),
+        )
+        db_memory.commit()
+
+        result = svc.xoa_cdtotkvv_snapshot_ky("2026-09", "tester")
+
+        assert result.thanh_cong is True
+        assert db_memory.execute(
+            "SELECT COUNT(*) FROM cdtotkvv_snapshot WHERE ky='2026-09'"
+        ).fetchone()[0] == 0
+        assert db_memory.execute(
+            "SELECT COUNT(*) FROM cbtd_to_tkvv_snapshot WHERE ky='2026-09'"
+        ).fetchone()[0] == 0
+        assert db_memory.execute(
+            "SELECT COUNT(*) FROM hstd_snapshot WHERE ky='2026-09'"
+        ).fetchone()[0] == 1
 
 
 # ══════════════════════════════════════════════════════════════════════════════

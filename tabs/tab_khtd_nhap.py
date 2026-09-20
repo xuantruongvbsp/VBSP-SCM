@@ -78,7 +78,7 @@ from services.khtd_nhap_service import (
 _KHTD_CACHE_MAX_ENTRIES = 3
 
 _PGD_XA_STT_CHUAN: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
-    ("I",  "Hội sở chi nhánh tỉnh", (
+    ("I",  "Hội sở chi nhánh thành phố", (
         ("1", "Phường Phước Tân"),
         ("2", "Phường Biên Hòa"),
         ("3", "Phường Trấn Biên"),
@@ -2587,7 +2587,7 @@ def _xuat_pdf_tat_ca_95_xa_bytes(
 
     Cấu trúc:
       - Bìa (Cover) + Trang tính mục lục tóm tắt (số xã có KH, tổng KH CN)
-      - Với mỗi PGD: Header lớn "I — Hội sở chi nhánh tỉnh" + HR + từng xã
+      - Với mỗi PGD: Header lớn "I — Hội sở chi nhánh thành phố" + HR + từng xã
       - Với mỗi xã: Header "Mục 1 · Phường Phước Tân" + 1 bảng 10 cột KH/TH/Còn/%
     """
     from reportlab.lib.pagesizes import A4, landscape
@@ -2725,7 +2725,7 @@ def _xuat_pdf_tat_ca_95_xa_bytes(
             ))
 
             df_xa, dong_tong_xa, _, _ = _tao_df_pdf_1_xa(
-                ten_p.replace("Hội sở chi nhánh tỉnh", "Hội sở"),
+                ten_p.replace("Hội sở chi nhánh thành phố", "Hội sở"),
                 ten_x,
                 df_full,
                 kh_xa_full,

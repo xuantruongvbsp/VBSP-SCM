@@ -1,22 +1,22 @@
-"""Package So sánh kỳ — tái cấu trúc khoa học từ tab_so_sanh_ky.py + tab_so_sanh_2_ky.py."""
+"""UI quản lý snapshot dữ liệu.
+
+Màn này thuộc luồng Upload dữ liệu: chạy lại snapshot kỳ hiện tại, bơm snapshot
+kỳ cũ và kiểm tra/xóa snapshot đã lưu.
+"""
 from __future__ import annotations
 
-from streamlit.delta_generator import DeltaGenerator
+import hashlib
+from pathlib import Path
+
+import streamlit as st
 
 import db
-from auth import normalize_role
 from logger import get_logger
-from tabs.base_tab import TabContext
-from tabs.tab_so_sanh_ky.render_moc_nam import render_moc_nam
-from tabs.tab_so_sanh_ky.render_2_ky import render_2_ky
-from tabs.tab_so_sanh_ky.render_nhieu_ky import render_nhieu_ky
 from snapshot_service import (
     danh_sach_ky,
     validate_snapshot,
     xoa_snapshot,
 )
-
-import streamlit as st
 
 
 logger = get_logger(__name__)
@@ -66,6 +66,7 @@ def _build_matrix_ky_loai(rows: list[dict]) -> "pd.DataFrame | None":
         return None
     try:
         import pandas as pd
+
         df = pd.DataFrame(rows)
         matrix = (
             df.pivot_table(index="Kỳ", columns="Loại", values="Số dòng", aggfunc="sum")
@@ -79,15 +80,17 @@ def _build_matrix_ky_loai(rows: list[dict]) -> "pd.DataFrame | None":
 
 
 def _render_chay_lai_snapshot(username: str) -> None:
-    """B3 — nút chạy lại snapshot kỳ hiện tại (đồng bộ, có progress)."""
-    st.markdown("#### 🔁 Chạy lại snapshot kỳ hiện tại")
+    """Chạy lại các snapshot HSTD kỳ hiện tại từ cache hiện hành."""
+    _upload_ver = st.session_state.setdefault("ql_snap_bom_upload_ver", 0)
+    st.markdown("#### 🔁 Chạy lại snapshot HSTD kỳ hiện tại")
     st.caption(
-        "Đọc `cache/hstd.parquet` (kỳ đang hiển thị toàn CN) và ghi lại TOÀN BỘ snapshot "
-        "HSTD / Thôn / Ủy thác / CDTOTKVV / CBTD–Tổ. Dùng khi auto-snapshot nền bị lỗi "
-        "hoặc thiếu loại. Không ghi đè cache."
+        "Đọc `cache/hstd.parquet` và ghi lại HSTD / Thôn / Ủy thác. "
+        "CDTOTKVV / CBTD–Tổ được tạo theo kỳ chấm điểm khi upload CDTOTKVV, "
+        "không dùng kỳ HSTD. Không ghi đè cache."
     )
-    if st.button("🔁 Chạy lại snapshot kỳ hiện tại", key="ql_snap_rerun_btn", use_container_width=True):
+    if st.button("🔁 Chạy lại snapshot HSTD kỳ hiện tại", key="ql_snap_rerun_btn", use_container_width=True):
         from services.upload_service import chay_lai_snapshot_ky_hien_tai
+
         progress = st.progress(0.0, text="Đang chuẩn bị…")
 
         def _cb(pct: float, msg: str) -> None:
@@ -99,6 +102,7 @@ def _render_chay_lai_snapshot(username: str) -> None:
             st.success(kq.thong_bao)
         else:
             st.error(kq.thong_bao)
+        st.session_state["ql_snap_bom_upload_ver"] = _upload_ver + 1
         st.rerun()
 
 
@@ -109,14 +113,14 @@ def _ky_la_thang_12(ky: str) -> bool:
 
 
 def _render_bom_snapshot_ky_cu(username: str) -> None:
-    """B2 — bơm snapshot cho một kỳ cũ từ file từng đơn vị (không đụng cache)."""
+    """Bơm snapshot cho một kỳ cũ từ file từng đơn vị, không đụng cache hiện hành."""
+    _upload_ver = st.session_state.setdefault("ql_snap_bom_upload_ver", 0)
     st.markdown("#### 📥 Bơm snapshot kỳ cũ")
     st.caption(
         "Khôi phục mốc so sánh (tháng trước / 31-12 năm trước) mà **không phải upload lại "
         "kỳ mới nhất**. Chỉ ghi snapshot cho kỳ nhập bên dưới; không đổi dữ liệu hiện hành "
         "của app. Ngày số liệu trong file phải đúng ngày cuối kỳ."
     )
-    from pathlib import Path
 
     loai_dl = st.radio(
         "Loại dữ liệu",
@@ -131,7 +135,6 @@ def _render_bom_snapshot_ky_cu(username: str) -> None:
         key="ql_snap_bom_ky",
     )
 
-    # ── Chốt chặn an toàn: kỳ tháng 12 là mốc baseline 31/12 ──
     la_thang_12 = _ky_la_thang_12(ky)
     xac_nhan_baseline = True
     if la_thang_12:
@@ -144,6 +147,7 @@ def _render_bom_snapshot_ky_cu(username: str) -> None:
         )
         if la_hstd and _nam_bl.isdigit():
             from config import baseline_cache_loai
+
             _cache_bl = baseline_cache_loai(int(_nam_bl), "hstd")
             if Path(_cache_bl).exists():
                 st.info(
@@ -166,12 +170,12 @@ def _render_bom_snapshot_ky_cu(username: str) -> None:
         "file HSTD của các đơn vị" if la_hstd
         else "file CDTOTKVV (1 file toàn CN hoặc nhiều file từng đơn vị)"
     )
-    files_bytes: dict[str, bytes] = {}   # tên file gốc → bytes
+    files_bytes: dict[str, bytes] = {}
     if nguon == "Upload file":
         uploaded = st.file_uploader(
             f"Chọn {label_file} (có thể chọn nhiều file)",
             type=["xlsx", "xls"], accept_multiple_files=True,
-            key="ql_snap_bom_files",
+            key=f"ql_snap_bom_files_{_upload_ver}",
         )
         for uf in uploaded or []:
             try:
@@ -189,7 +193,14 @@ def _render_bom_snapshot_ky_cu(username: str) -> None:
             if not p.exists() or not p.is_dir():
                 st.warning("⚠️ Thư mục không tồn tại.")
             else:
-                for f in sorted(p.glob("*.xlsx")) + sorted(p.glob("*.xls")):
+                files_excel = sorted(
+                    (
+                        f for f in p.iterdir()
+                        if f.is_file() and f.suffix.lower() in {".xlsx", ".xls"}
+                    ),
+                    key=lambda f: f.name.casefold(),
+                )
+                for f in files_excel:
                     if f.name.startswith("~$"):
                         continue
                     try:
@@ -201,7 +212,6 @@ def _render_bom_snapshot_ky_cu(username: str) -> None:
     if not files_bytes:
         return
 
-    # ── Nhánh CDTOTKVV: đơn vị nằm TRONG nội dung file, không cần nhận diện ──
     if not la_hstd:
         st.caption(
             f"Đã nạp **{len(files_bytes)}** file. Đơn vị được đọc tự động từ nội dung file "
@@ -213,57 +223,132 @@ def _render_bom_snapshot_ky_cu(username: str) -> None:
             use_container_width=True,
         ):
             from services.upload_service import bom_snapshot_cdtotkvv_ky_cu
+
             with st.spinner(f"Đang bơm snapshot Tổ TK&VV kỳ {ky.strip()}…"):
                 kq = bom_snapshot_cdtotkvv_ky_cu(ky.strip(), files_bytes, username)
             if kq.thanh_cong:
                 st.success(kq.thong_bao)
             else:
                 st.error(kq.thong_bao)
+            st.session_state["ql_snap_bom_upload_ver"] = _upload_ver + 1
             st.rerun()
         return
 
-    # ── Nhánh HSTD: nhận diện đơn vị cho từng file ──
+    from config import DON_VI_CHI_NHANH, DS_PGD
     from services.file_detection_service import tim_ten_pgd_tu_noi_dung
-    from config import DS_PGD, DON_VI_CHI_NHANH
 
-    files_theo_don_vi: dict[str, bytes] = {}
-    preview: list[dict] = []
+    ds_don_vi = [DON_VI_CHI_NHANH] + DS_PGD
+    ds_hop_le = set(ds_don_vi)
+    ung_vien: dict[str, list[tuple[str, bytes]]] = {}
+    nhan_dien_theo_file: dict[str, str | None] = {}
     for ten_file, data in files_bytes.items():
         try:
             ten_dv = tim_ten_pgd_tu_noi_dung(data, "hstd")
         except Exception as e:
             logger.error("_render_bom_snapshot_ky_cu: nhận diện %s — %s", ten_file, e, exc_info=True)
             ten_dv = None
-        if ten_dv:
-            files_theo_don_vi[ten_dv] = data
-        preview.append({"File": ten_file, "Đơn vị nhận diện": ten_dv or "❓ KHÔNG nhận diện"})
+        nhan_dien_theo_file[ten_file] = ten_dv
+        if ten_dv in ds_hop_le:
+            ung_vien.setdefault(ten_dv, []).append((ten_file, data))
+
+    files_theo_don_vi: dict[str, bytes] = {}
+    file_duoc_chon: dict[str, str] = {}
+    file_trung_giong_het: set[str] = set()
+    don_vi_co_nhieu_ban_khac: list[str] = []
+    for ten_dv in ds_don_vi:
+        ds_ung_vien = ung_vien.get(ten_dv, [])
+        if not ds_ung_vien:
+            continue
+        if len(ds_ung_vien) == 1:
+            ten_file_chon, data_chon = ds_ung_vien[0]
+        else:
+            hashes = {
+                hashlib.sha256(data).hexdigest()
+                for _, data in ds_ung_vien
+            }
+            if len(hashes) == 1:
+                ten_file_chon, data_chon = ds_ung_vien[0]
+                file_trung_giong_het.update(ten for ten, _ in ds_ung_vien[1:])
+            else:
+                don_vi_co_nhieu_ban_khac.append(ten_dv)
+                ten_file_chon = st.selectbox(
+                    f"Chọn file dùng cho {ten_dv}",
+                    [ten for ten, _ in ds_ung_vien],
+                    key=f"ql_snap_chon_{hashlib.sha1(ten_dv.encode('utf-8')).hexdigest()[:10]}",
+                )
+                data_chon = next(data for ten, data in ds_ung_vien if ten == ten_file_chon)
+        files_theo_don_vi[ten_dv] = data_chon
+        file_duoc_chon[ten_dv] = ten_file_chon
+
+    preview: list[dict] = []
+    for ten_file in files_bytes:
+        ten_dv = nhan_dien_theo_file.get(ten_file)
+        if not ten_dv:
+            trang_thai = "Bỏ qua — không nhận diện"
+        elif ten_dv not in ds_hop_le:
+            trang_thai = "Bỏ qua — ngoài danh mục"
+        elif file_duoc_chon.get(ten_dv) == ten_file:
+            trang_thai = "Sử dụng"
+        elif ten_file in file_trung_giong_het:
+            trang_thai = "Bỏ qua — bản sao giống hệt"
+        else:
+            trang_thai = "Bỏ qua — không được chọn"
+        preview.append({
+            "File": ten_file,
+            "Đơn vị nhận diện": ten_dv or "❓ KHÔNG nhận diện",
+            "Xử lý": trang_thai,
+        })
 
     st.markdown("**Nhận diện đơn vị:**")
     st.dataframe(preview, use_container_width=True, hide_index=True)
     n_dv = len(files_theo_don_vi)
-    ds_hop_le = set(DS_PGD) | {DON_VI_CHI_NHANH}
     thieu = sorted(ds_hop_le - set(files_theo_don_vi))
     st.caption(
-        f"Nhận diện được **{n_dv}** file hợp lệ."
+        f"Đã chọn **{n_dv}/22** đơn vị."
         + (f" Thiếu {len(thieu)} đơn vị: {', '.join(thieu[:8])}{'…' if len(thieu) > 8 else ''}." if thieu else " Đủ tất cả đơn vị.")
     )
+    if don_vi_co_nhieu_ban_khac:
+        st.info(
+            "Có nhiều file khác nhau cho: " + ", ".join(don_vi_co_nhieu_ban_khac)
+            + ". Hệ thống chỉ dùng file được chọn ở trên."
+        )
+
+    ky_da_ton_tai = bool(ky.strip() and ky.strip() in set(danh_sach_ky()))
+    xac_nhan_thay_the = True
+    if ky_da_ton_tai:
+        st.warning(
+            f"Kỳ **{ky.strip()}** đã có dữ liệu. Thao tác này sẽ thay thế trọn kỳ "
+            "HSTD / Thôn / Ủy thác sau khi đủ 22 đơn vị được kiểm tra."
+        )
+        xac_nhan_thay_the = st.checkbox(
+            f"Tôi xác nhận thay thế trọn snapshot kỳ {ky.strip()}",
+            key="ql_snap_bom_xac_nhan_thay_the",
+        )
 
     if st.button(
         "📥 Bơm snapshot kỳ này", key="ql_snap_bom_btn",
-        disabled=not (ky.strip() and files_theo_don_vi) or (la_thang_12 and not xac_nhan_baseline),
+        disabled=(
+            not ky.strip()
+            or set(files_theo_don_vi) != ds_hop_le
+            or (la_thang_12 and not xac_nhan_baseline)
+            or not xac_nhan_thay_the
+        ),
         use_container_width=True,
     ):
         from services.upload_service import bom_snapshot_ky_cu
+
         with st.spinner(f"Đang bơm snapshot kỳ {ky.strip()}…"):
             kq = bom_snapshot_ky_cu(ky.strip(), files_theo_don_vi, username, loai="hstd")
         if kq.thanh_cong:
             st.success(kq.thong_bao)
         else:
             st.error(kq.thong_bao)
+        st.session_state["ql_snap_bom_upload_ver"] = _upload_ver + 1
         st.rerun()
 
 
-def _render_quan_ly_snapshot(username: str) -> None:
+def render_snapshot_management(username: str) -> None:
+    """Render màn quản lý snapshot trong luồng Upload dữ liệu."""
     st.subheader("🧭 Quản lý Snapshot")
     rows = _doc_snapshot_inventory()
     if rows:
@@ -305,28 +390,3 @@ def _render_quan_ly_snapshot(username: str) -> None:
             xoa_snapshot(ky_xoa, username)
             st.success(f"Đã xóa snapshot kỳ {ky_xoa}.")
             st.rerun()
-
-
-def render(tab: DeltaGenerator = None, **kwargs) -> None:
-    """Entry point: router chọn loại so sánh."""
-    ctx = TabContext(tab, **kwargs)
-    role = normalize_role(str(kwargs.get("role", "user") or "user"))
-    username = kwargs.get("username", "unknown")
-    kwargs["role"] = role
-
-    with ctx:
-        options = ["📊 So sánh nhiều kỳ", "📅 So sánh mốc năm", "🔄 So sánh 2 kỳ"]
-        sub = st.radio(
-            "Loại so sánh",
-            options,
-            horizontal=True,
-            key="ss_ky_sub",
-            label_visibility="collapsed",
-        )
-        st.divider()
-        if sub == "📅 So sánh mốc năm":
-            render_moc_nam(None, **kwargs)
-        elif sub == "🔄 So sánh 2 kỳ":
-            render_2_ky(None, **kwargs)
-        else:
-            render_nhieu_ky(None, **kwargs)

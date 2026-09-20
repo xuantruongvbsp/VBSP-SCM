@@ -1,6 +1,6 @@
 # TEST_COVERAGE.md — Bản đồ Kiểm thử VBSP-SCM
 > **Đọc trước khi viết test mới** — tránh trùng lặp, biết lỗ hổng.
-> Cập nhật: 2026-05-22
+> Cập nhật: 2026-09-20
 
 ---
 
@@ -8,8 +8,8 @@
 
 | | Số lượng |
 |---|---|
-| File test | 47 |
-| Test cases (ước tính) | ~851 |
+| File test | 96 |
+| Test cases | 1.530 |
 | Modules có test | 31/~60 |
 | 🔴 Modules chưa có test | ~30 |
 
@@ -29,9 +29,9 @@
 
 | Module | Test file | Cases | Mức độ | Ghi chú |
 |---|---|---|---|---|
-| `upload_service.py` | `test_upload_service.py` | 9 | 🟡 Trung bình | Validation file; chưa test merge path đầy đủ |
+| `upload_service.py` | `test_upload_service.py` + `test_hstd_toan_cn.py` | 33 | 🟢 Khá | Validation file; HSTD toàn CN đủ 22, alias, tên lạ và rollback; chưa test merge path đầy đủ |
 | Merge toàn CN | `test_merge_du_lieu_toan_cn.py` | 22 | ✅ Cao | Schema, rollback, metadata, audit — toàn diện |
-| `snapshot_service.py` | `test_snapshot_service.py` | 12 | ✅ Cao | CRUD, date parsing, ranges |
+| `snapshot_service.py` | `test_snapshot_service.py` + `test_cdtotkvv_history.py` | 78 | ✅ Cao | CRUD, date parsing, ranges, thay trọn kỳ CDTOTKVV và xóa riêng kỳ sai |
 | `tien_do_service.py` | `test_tien_do_service.py` | 3 | 🔴 Thấp | Chỉ 3 smoke cases |
 | `no_rui_ro_service.py` | `test_no_rui_ro_service.py` | 3 | 🔴 Thấp | KV key, roundtrip, delete |
 | `khnv_noi_bo_service.py` | `test_khnv_noi_bo_service.py` | 2 | 🔴 Thấp | CRUD + audit |

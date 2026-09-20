@@ -668,6 +668,9 @@ def _build_export_frames(
     def _to_trieu(value_vnd: float) -> float:
         return value_vnd / 1_000_000
 
+    delta_prev_col = f"Tăng/giảm so với {label_prev} (triệu đồng)"
+    pct_prev_col = f"Tỷ lệ % so với {label_prev}"
+
     huy_dong_ht = _lookup_vnd(rows_ht, "Tổng huy động vốn", he_so_ht)
     tiet_kiem_tkvv_ht = _lookup_vnd(rows_ht, "Tiền gửi tiết kiệm qua Tổ TK&VV", he_so_ht)
     tien_gui_tt_ht = huy_dong_ht - tiet_kiem_tkvv_ht
@@ -725,8 +728,8 @@ def _build_export_frames(
             "Chỉ tiêu": row_ht["ten"],
             f"{label_prev} (triệu đồng)": _to_trieu(value_prev),
             f"{label_ht} (triệu đồng)": _to_trieu(value_ht),
-            "Tăng/giảm so với năm trước (triệu đồng)": _to_trieu(diff_pv),
-            "Tỷ lệ % năm trước": round(diff_pv / value_prev * 100, 2) if value_prev else 0,
+            delta_prev_col: _to_trieu(diff_pv),
+            pct_prev_col: round(diff_pv / value_prev * 100, 2) if value_prev else 0,
         }
         if _has_pm:
             row_d["Tháng trước (triệu đồng)"] = _to_trieu(value_pm)
@@ -743,8 +746,8 @@ def _build_export_frames(
                 "Chỉ tiêu": "TG TT TCTC & TK CN (= HĐV − TK qua Tổ TK&VV)",
                 f"{label_prev} (triệu đồng)": _to_trieu(value_prev_tg),
                 f"{label_ht} (triệu đồng)": _to_trieu(tien_gui_tt_ht),
-                "Tăng/giảm so với năm trước (triệu đồng)": _to_trieu(diff_pv_tg),
-                "Tỷ lệ % năm trước": round(diff_pv_tg / value_prev_tg * 100, 2) if value_prev_tg else 0,
+                delta_prev_col: _to_trieu(diff_pv_tg),
+                pct_prev_col: round(diff_pv_tg / value_prev_tg * 100, 2) if value_prev_tg else 0,
             }
             if _has_pm:
                 if tien_gui_tt_pm is None:
@@ -1703,8 +1706,8 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 "Chỉ tiêu":  ind + ten_hien,
                 label_pv:    val_pv if db_prev_rows else 0,
                 label_ht:    val_ht,
-                "Tăng/giảm so với năm trước": cl_pv if cl_pv is not None else 0,
-                "Tỷ lệ % năm trước":   tl_pv if tl_pv is not None else 0,
+                f"Tăng/giảm so với {label_pv}": cl_pv if cl_pv is not None else 0,
+                f"Tỷ lệ % so với {label_pv}": tl_pv if tl_pv is not None else 0,
                 "Tháng trước": val_pm if db_prev_month_rows else 0,
                 "Tăng/giảm so với tháng trước": cl_pm if cl_pm is not None else 0,
                 "Tỷ lệ % tháng trước":   tl_pm if tl_pm is not None else 0,
@@ -1976,17 +1979,19 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                             if db_prev_rows and _val_pv_tg > 0:
                                 _match_count += 1
                     if rows_detail:
+                        _delta_pv_col = f"Tăng/giảm so với {label_pv}"
+                        _pct_pv_col = f"Tỷ lệ % so với {label_pv}"
                         cols_s = ["Chỉ tiêu", label_pv, label_ht,
-                                  "Tăng/giảm so với năm trước", "Tỷ lệ % năm trước",
+                                  _delta_pv_col, _pct_pv_col,
                                   "Tháng trước", "Tăng/giảm so với tháng trước", "Tỷ lệ % tháng trước"]
                         # Chỉ giữ cột tháng trước khi có dữ liệu
                         if not db_prev_month_rows:
                             cols_s = [c for c in cols_s if "tháng trước" not in c.lower() and "Tháng trước" not in c]
                         df_s = pd.DataFrame(rows_detail)[cols_s].copy()
-                        for _col in [label_pv, label_ht, "Tăng/giảm so với năm trước", "Tháng trước", "Tăng/giảm so với tháng trước"]:
+                        for _col in [label_pv, label_ht, _delta_pv_col, "Tháng trước", "Tăng/giảm so với tháng trước"]:
                             if _col in df_s.columns:
                                 df_s[_col] = df_s[_col].apply(_fmt_vnd_trieu)
-                        for _pcol in ["Tỷ lệ % năm trước", "Tỷ lệ % tháng trước"]:
+                        for _pcol in [_pct_pv_col, "Tỷ lệ % tháng trước"]:
                             if _pcol in df_s.columns:
                                 df_s[_pcol] = df_s[_pcol].apply(fmt_pct)
                         hien_thi_dataframe_phan_trang(

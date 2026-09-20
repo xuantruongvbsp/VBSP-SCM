@@ -300,7 +300,7 @@ def test_dem_nguon_von_nan_co_ma_ndt_tinh_ca_chuoi_rong():
 def test_bang_nguon_von_xa_02_ct_khop_so_chuan(monkeypatch):
     monkeypatch.setattr(tab_hhi.db, "doc_ndt_dp_rule_list", lambda: [])
     expected = [
-        ("Hội sở tỉnh", 10400, 0),
+        ("Hội sở thành phố", 10400, 0),
         ("Long Thành", 4600, 0),
         ("Trảng Bom", 3100, 0),
         ("Long Khánh", 3550, 0),

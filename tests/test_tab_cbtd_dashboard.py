@@ -82,3 +82,67 @@ def test_xlsx_chi_tiet_canh_bao_sheet_hop_le_va_noi_dung_sach():
     assert rows_all[1][2] == "PGD A"
     assert "**" not in str(rows_all[1][3])
     assert all("<NA>" not in str(cell) and str(cell).lower() != "nan" for row in rows_all for cell in row)
+
+
+def test_doc_cdtotkvv_moi_nhat_uu_tien_nguon_trung_tam(monkeypatch):
+    from services import cdtotkvv_service, tongquan_cdto_service
+
+    df_trung_tam = pd.DataFrame({"ten_dv": ["PGD A"], "ten_xa": ["Xã A"], "ma_to": ["T01"]})
+    df_fallback = pd.DataFrame({"ten_dv": ["PGD B"], "ten_xa": ["Xã B"], "ma_to": ["T02"]})
+    monkeypatch.setattr(tongquan_cdto_service, "load_cdto_toan_cn", lambda: {"df_raw": df_trung_tam})
+    monkeypatch.setattr(cdtotkvv_service, "tong_hop_tu_pgd_data", lambda: df_fallback)
+
+    result = dashboard._doc_cdtotkvv_moi_nhat()
+
+    assert result is df_trung_tam
+
+
+def test_doc_cdtotkvv_moi_nhat_fallback_khi_nguon_trung_tam_rong(monkeypatch):
+    from services import cdtotkvv_service, tongquan_cdto_service
+
+    df_fallback = pd.DataFrame({"ten_dv": ["PGD B"], "ten_xa": ["Xã B"], "ma_to": ["T02"]})
+    monkeypatch.setattr(tongquan_cdto_service, "load_cdto_toan_cn", lambda: {"df_raw": pd.DataFrame()})
+    monkeypatch.setattr(cdtotkvv_service, "tong_hop_tu_pgd_data", lambda: df_fallback)
+
+    result = dashboard._doc_cdtotkvv_moi_nhat()
+
+    assert result is df_fallback
+
+
+def test_loc_df_cdto_khop_pgd_bang_ma_dv_va_xa_co_tien_to():
+    df_cdto = pd.DataFrame({
+        "ma_dv": ["004602", "004602", "004603"],
+        "ten_dv": ["Tên lệch", "Tên lệch", "PGD Trảng Bom"],
+        "ten_xa": ["Xã Long Đức", "Xã Khác", "Xã Long Đức"],
+        "ma_to": ["T01", "T02", "T03"],
+    })
+    cbtd_data = {"CB01": {"pgd": "PGD Long Thành", "ds_dgd": ["ĐGD 1"]}}
+    dgd_map = {"PGD Long Thành": {"Long Đức": {"ĐGD 1": {}}}}
+
+    result = dashboard._loc_df_cdto(df_cdto, cbtd_data, dgd_map, "PGD Long Thành", "CB01")
+
+    assert result["ma_to"].tolist() == ["T01"]
+
+
+def test_loc_df_cdto_chon_cbtd_khoa_theo_pgd_truoc_khi_loc_xa():
+    df_cdto = pd.DataFrame({
+        "ma_dv": ["004602", "004603"],
+        "ten_dv": ["Tên lệch A", "PGD Trảng Bom"],
+        "ten_xa": ["Xã Long Đức", "Xã Long Đức"],
+        "ma_to": ["T01", "T02"],
+    })
+    cbtd_data = {
+        "CB01": {"pgd": "PGD Long Thành", "ds_dgd": ["ĐGD 1"]},
+    }
+    dgd_map = {
+        "PGD Long Thành": {
+            "Long Đức": {" ĐGD 1 ": {}},
+        },
+        "PGD Trảng Bom": {
+            "Long Đức": {"ĐGD khác": {}},
+        },
+    }
+
+    result = dashboard._loc_df_cdto(df_cdto, cbtd_data, dgd_map, "(Tất cả)", "CB01")
+
+    assert result["ma_to"].tolist() == ["T01"]

@@ -234,6 +234,7 @@ def xuat_pdf_co_chart(
     them_ngay_xuat: bool = True,
     cols_percent: list[str] | None = None,
     cols_dem: list[str] | None = None,
+    bang_phu: list[dict] | None = None,
 ) -> bytes:
     """Xuất PDF kèm biểu đồ.
 
@@ -249,6 +250,8 @@ def xuat_pdf_co_chart(
         them_ngay_xuat: Thêm ngày xuất
         cols_percent: Danh sách cột phần trăm
         cols_dem: Danh sách cột số đếm (số KH, số món...)
+        bang_phu: Các bảng phụ in tiếp trang sau, mỗi phần tử là dict gồm
+            {tieu_de, df, cols_tien, cols_dem, cols_percent, them_dong_tong}
 
     Returns:
         bytes: Nội dung file PDF
@@ -286,17 +289,16 @@ def xuat_pdf_co_chart(
     fb = FONT_BOLD
     fi = FONT_ITALIC
 
-    if n_cols <= 5:
-        font_size = 10
-    elif n_cols <= 8:
-        font_size = 9.5
-    elif n_cols <= 12:
-        font_size = 9
-    elif n_cols <= 16:
-        font_size = 8
-    else:
-        font_size = 7.5
-    header_font_size = font_size + 1.5
+    def _chon_font(n_c: int) -> float:
+        if n_c <= 5:
+            return 10.5
+        if n_c <= 8:
+            return 10
+        if n_c <= 12:
+            return 9.5
+        if n_c <= 16:
+            return 8.5
+        return 8
 
     style_caption = ParagraphStyle(
         "Caption", fontName=fi, fontSize=9,
@@ -371,48 +373,61 @@ def xuat_pdf_co_chart(
                 elements.append(Paragraph(f"[Không thể render biểu đồ: {caption}]", style_caption))
 
     # ── Bảng dữ liệu ──
-    if cols:
+    def _render_bang(df_x, cols_tien_x, cols_percent_x, cols_dem_x, them_tong_x, tieu_de_phu=None):
+        if df_x is None or df_x.empty:
+            return False
+        _cols = list(df_x.columns)
+        _fsz = _chon_font(len(_cols))
+        _hfsz = _fsz + 1.5
+
+        if tieu_de_phu:
+            elements.append(Paragraph(
+                _pdf_text(str(tieu_de_phu).upper()),
+                ParagraphStyle("SecTitle", fontName=fb, fontSize=_fsz + 2,
+                               alignment=TA_CENTER, textColor=VBSP_GREEN,
+                               spaceAfter=0.3 * cm, leading=_fsz + 4),
+            ))
         elements.append(Spacer(1, 0.2 * cm))
 
         header_style = ParagraphStyle(
-            "Header2", fontName=fb, fontSize=header_font_size,
-            alignment=TA_CENTER, textColor=colors.white, leading=header_font_size + 4,
+            "Header2", fontName=fb, fontSize=_hfsz,
+            alignment=TA_CENTER, textColor=colors.white, leading=_hfsz + 4,
         )
-        headers = [Paragraph(_pdf_text(str(c).replace("_", " ")), header_style) for c in cols]
+        headers = [Paragraph(_pdf_text(str(c).replace("_", " ")), header_style) for c in _cols]
 
         cell_right_style = ParagraphStyle(
-            "CellR", fontName=fn, fontSize=font_size,
-            alignment=TA_RIGHT, leading=font_size + 3,
+            "CellR", fontName=fn, fontSize=_fsz,
+            alignment=TA_RIGHT, leading=_fsz + 3,
         )
         cell_left_style = ParagraphStyle(
-            "CellL", fontName=fn, fontSize=font_size,
-            alignment=TA_LEFT, leading=font_size + 3, wordWrap="CJK",
+            "CellL", fontName=fn, fontSize=_fsz,
+            alignment=TA_LEFT, leading=_fsz + 3, wordWrap="CJK",
         )
         cell_center_style = ParagraphStyle(
-            "CellC", fontName=fn, fontSize=font_size,
-            alignment=TA_CENTER, leading=font_size + 3, wordWrap="CJK",
+            "CellC", fontName=fn, fontSize=_fsz,
+            alignment=TA_CENTER, leading=_fsz + 3, wordWrap="CJK",
         )
 
         data_rows = []
-        for _, row in df.iterrows():
+        for _, row in df_x.iterrows():
             cells = []
-            for i, c in enumerate(cols):
+            for i, c in enumerate(_cols):
                 val = row[c]
                 if pd.isna(val):
                     p = Paragraph(
                         "",
                         cell_left_style if _is_left_align(c) else cell_right_style,
                     )
-                elif c in cols_percent:
+                elif c in cols_percent_x:
                     txt = _pdf_text(_format_phan_tram(val))
                     p = Paragraph(txt, cell_right_style)
-                elif c in cols_tien:
+                elif c in cols_tien_x:
                     try:
                         txt = _format_number_pdf(val, c)
                     except (ValueError, TypeError):
                         txt = _pdf_text(val)
                     p = Paragraph(txt, cell_right_style)
-                elif c in cols_dem:
+                elif c in cols_dem_x:
                     try:
                         txt = _format_number_pdf(val, c)
                     except (ValueError, TypeError):
@@ -429,39 +444,39 @@ def xuat_pdf_co_chart(
                 cells.append(p)
             data_rows.append(cells)
 
-        has_tong = them_dong_tong and cols_tien and len(df) > 0
+        has_tong = them_tong_x and cols_tien_x and len(df_x) > 0
         if has_tong:
             tong_row_cells = []
             tong_right_style = ParagraphStyle(
-                "TongR", fontName=fb, fontSize=font_size,
-                alignment=TA_RIGHT, leading=font_size + 3, textColor=VBSP_GREEN,
+                "TongR", fontName=fb, fontSize=_fsz,
+                alignment=TA_RIGHT, leading=_fsz + 3, textColor=VBSP_GREEN,
             )
             tong_center_style = ParagraphStyle(
-                "TongC", fontName=fb, fontSize=font_size,
-                alignment=TA_CENTER, leading=font_size + 3, textColor=VBSP_GREEN,
+                "TongC", fontName=fb, fontSize=_fsz,
+                alignment=TA_CENTER, leading=_fsz + 3, textColor=VBSP_GREEN,
             )
             tong_left_style = ParagraphStyle(
-                "TongL", fontName=fb, fontSize=font_size,
-                alignment=TA_LEFT, leading=font_size + 3, textColor=VBSP_GREEN,
+                "TongL", fontName=fb, fontSize=_fsz,
+                alignment=TA_LEFT, leading=_fsz + 3, textColor=VBSP_GREEN,
             )
-            for i, c in enumerate(cols):
-                if c in cols_percent:
+            for i, c in enumerate(_cols):
+                if c in cols_percent_x:
                     try:
-                        tong = pd.to_numeric(df[c], errors="coerce").mean()
+                        tong = pd.to_numeric(df_x[c], errors="coerce").mean()
                         txt = f"<b>{_pdf_text(_format_phan_tram(tong))}</b>"
                     except Exception:
                         txt = ""
                     tong_row_cells.append(Paragraph(txt, tong_right_style))
-                elif c in cols_tien:
+                elif c in cols_tien_x:
                     try:
-                        tong = pd.to_numeric(df[c], errors="coerce").sum()
+                        tong = pd.to_numeric(df_x[c], errors="coerce").sum()
                         txt = f"<b>{_pdf_text(_format_number_pdf(tong, c))}</b>"
                     except Exception:
                         txt = ""
                     tong_row_cells.append(Paragraph(txt, tong_right_style))
-                elif c in cols_dem:
+                elif c in cols_dem_x:
                     try:
-                        tong = pd.to_numeric(df[c], errors="coerce").sum()
+                        tong = pd.to_numeric(df_x[c], errors="coerce").sum()
                         txt = f"<b>{_pdf_text(_format_number_pdf(tong, c))}</b>"
                     except Exception:
                         txt = ""
@@ -474,7 +489,7 @@ def xuat_pdf_co_chart(
 
         table_data = [headers] + data_rows
 
-        ratios = [_col_ratio(c) for c in cols]
+        ratios = [_col_ratio(c) for c in _cols]
         total_ratio = sum(ratios)
         col_widths = [usable_w * r / total_ratio for r in ratios]
 
@@ -483,7 +498,7 @@ def xuat_pdf_co_chart(
             ("BACKGROUND", (0, 0), (-1, 0), VBSP_GREEN),
             ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
             ("FONTNAME", (0, 0), (-1, 0), fb),
-            ("FONTSIZE", (0, 0), (-1, 0), header_font_size),
+            ("FONTSIZE", (0, 0), (-1, 0), _hfsz),
             ("ALIGN", (0, 0), (-1, 0), "CENTER"),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ("TOPPADDING", (0, 0), (-1, -1), 5),
@@ -514,7 +529,7 @@ def xuat_pdf_co_chart(
 
         tbl.setStyle(TableStyle(style_cmds))
 
-        for ci, col in enumerate(cols):
+        for ci, col in enumerate(_cols):
             is_left = _is_left_align(col)
             is_center = _is_center_align(col)
             if not is_left and not is_center:
@@ -523,6 +538,28 @@ def xuat_pdf_co_chart(
                 ]))
 
         elements.append(tbl)
+        return True
+
+    # ── Bảng chính ──
+    _da_co_bang = _render_bang(df, cols_tien, cols_percent, cols_dem, them_dong_tong)
+
+    # ── Các bảng phụ (in tiếp trên trang sau) ──
+    for _bp in (bang_phu or []):
+        if not isinstance(_bp, dict):
+            continue
+        _df_x = _bp.get("df")
+        if _df_x is None or _df_x.empty:
+            continue
+        if _da_co_bang:
+            elements.append(PageBreak())
+        _da_co_bang = _render_bang(
+            _df_x,
+            _bp.get("cols_tien") or [],
+            _bp.get("cols_percent") or [],
+            _bp.get("cols_dem") or [],
+            _bp.get("them_dong_tong", False),
+            _bp.get("tieu_de"),
+        ) or _da_co_bang
 
     # ── Ghi chú đơn vị ──
     ghi_chu_parts = []

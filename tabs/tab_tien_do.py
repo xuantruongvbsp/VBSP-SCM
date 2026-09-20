@@ -139,7 +139,7 @@ def _render_tong_quan(tab, **kwargs):
                 "Loại": LOAI_TASK.get(t.get("loai", ""), t.get("loai", "")),
                 "Người phụ trách": t.get("nguoi_phu_trach") or "",
                 "CB KH-NV phụ trách": t.get("nguoi_thuc_hien_cn") or "",
-                "Hội sở CN tỉnh": t.get("cbtd_bien_hoa") or "",
+                "Hội sở CN thành phố": t.get("cbtd_bien_hoa") or "",
                 "Ưu tiên": UU_TIEN.get(t.get("uu_tien", ""), t.get("uu_tien", "")),
                 "Theo dõi": "Chung PGD" if t.get("cap_theo_doi") == "pgd" else "Chi tiết xã",
             }
@@ -378,7 +378,7 @@ Bỏ chọn nếu chỉ áp dụng cho một số PGD cụ thể.
             st.caption(
                 "Chọn đơn vị chịu trách nhiệm thực hiện đầu việc này. "
                 "Mỗi đơn vị được chọn sẽ có 1 dòng cập nhật tiến độ riêng. "
-                "Có thể áp dụng đồng thời cho PGD huyện và Hội sở CN tỉnh."
+                "Có thể áp dụng đồng thời cho PGD huyện và Hội sở CN thành phố."
             )
             st.markdown("**🏢 Phòng giao dịch trực thuộc**")
             _cc1, _cc2, _cc3 = st.columns(3)
@@ -404,14 +404,14 @@ Bỏ chọn nếu chỉ áp dụng cho một số PGD cụ thể.
 
             st.divider()
 
-            st.markdown("**🏛️ Hội sở CN tỉnh**")
+            st.markdown("**🏛️ Hội sở CN thành phố**")
             cbtd_bien_hoa = st.text_input(
                 "Cán bộ KH-NV phụ trách",
                 placeholder="Họ tên CBTD Hội sở phụ trách địa bàn Biên Hòa...",
                 key="tao_task_cbtd_bien_hoa",
             )
             st.caption(
-                "Địa bàn TP. Biên Hòa không có PGD riêng — CBTD tại Hội sở CN tỉnh "
+                "Địa bàn TP. Biên Hòa không có PGD riêng — CBTD tại Hội sở CN thành phố "
                 "trực tiếp quản lý. Điền tên cán bộ KH-NV phụ trách nếu đầu việc "
                 "này áp dụng cho địa bàn Biên Hòa. Để trống nếu không áp dụng."
             )
@@ -609,7 +609,7 @@ def _render_quan_ly_task(tab, **kwargs):
             st.caption(
                 "Chọn đơn vị chịu trách nhiệm thực hiện đầu việc này. "
                 "Mỗi đơn vị được chọn sẽ có 1 dòng cập nhật tiến độ riêng. "
-                "Có thể áp dụng đồng thời cho PGD huyện và Hội sở CN tỉnh."
+                "Có thể áp dụng đồng thời cho PGD huyện và Hội sở CN thành phố."
             )
             st.markdown("**🏢 Phòng giao dịch trực thuộc**")
             ds_pgd_task = json.loads(task.get("ds_pgd") or "[]") or DS_PGD
@@ -631,7 +631,7 @@ def _render_quan_ly_task(tab, **kwargs):
 
             st.divider()
 
-            st.markdown("**🏛️ Hội sở CN tỉnh**")
+            st.markdown("**🏛️ Hội sở CN thành phố**")
             cbtd_bien_hoa = st.text_input(
                 "Cán bộ KH-NV phụ trách",
                 value=str(task.get("cbtd_bien_hoa") or ""),
@@ -639,7 +639,7 @@ def _render_quan_ly_task(tab, **kwargs):
                 key=f"td_sua_cbtd_bien_hoa_{task_id}",
             )
             st.caption(
-                "Địa bàn TP. Biên Hòa không có PGD riêng — CBTD tại Hội sở CN tỉnh "
+                "Địa bàn TP. Biên Hòa không có PGD riêng — CBTD tại Hội sở CN thành phố "
                 "trực tiếp quản lý. Điền tên cán bộ KH-NV phụ trách nếu đầu việc "
                 "này áp dụng cho địa bàn Biên Hòa. Để trống nếu không áp dụng."
             )
@@ -815,7 +815,7 @@ def _render_cap_nhat(tab, **kwargs):
             if nguoi_thuc_hien_cn:
                 st.caption(f"👤 Cán bộ KH-NV phụ trách: {nguoi_thuc_hien_cn}")
             if cbtd_bien_hoa:
-                st.caption(f"🏛️ Hội sở CN tỉnh — CB KH-NV: {cbtd_bien_hoa}")
+                st.caption(f"🏛️ Hội sở CN thành phố — CB KH-NV: {cbtd_bien_hoa}")
             if badge:
                 st.info(badge)
             if task.get("mo_ta"):
@@ -1145,7 +1145,7 @@ def _render_xuat(tab, **kwargs):
                     "Ngày bắt đầu": t.get("ngay_bat_dau") or "",
                     "Người phụ trách": t.get("nguoi_phu_trach") or "",
                     "CB KH-NV phụ trách": t.get("nguoi_thuc_hien_cn") or "",
-                    "Hội sở CN tỉnh": t.get("cbtd_bien_hoa") or "",
+                    "Hội sở CN thành phố": t.get("cbtd_bien_hoa") or "",
                 })
             df_tonghop = pd.DataFrame(summary_rows)
 

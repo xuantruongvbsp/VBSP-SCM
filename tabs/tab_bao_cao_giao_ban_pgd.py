@@ -16,6 +16,7 @@ from config import (
 from auth import is_pgd_role, is_cn_role
 from data import danh_dau_khong_hd_cached
 from data.dgd_helpers import ds_ma_thon_cua_entry, ds_thon_cua_entry
+from services.cbtd_dia_ban_service import chuan_bi_hstd_bao_cao_dgd
 from utils import fmt_ty, fmt_so, hien_thi_dataframe_phan_trang
 from services.excel_service import xuat_excel_chuyen_nghiep
 from pdf_service import kiem_tra_pdf_dependency
@@ -222,6 +223,14 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
 
             st.warning(f"Không có dữ liệu cho điểm giao dịch **{chon_dgd or chon_xa}**")
 
+            return
+
+        df_dgd = chuan_bi_hstd_bao_cao_dgd(df_dgd)
+        if df_dgd.empty:
+            st.warning(
+                f"Không có dư nợ hợp lệ cho điểm giao dịch **{chon_dgd or chon_xa}** "
+                "sau khi khử trùng Số khế ước và loại NOXH trực tiếp."
+            )
             return
 
         

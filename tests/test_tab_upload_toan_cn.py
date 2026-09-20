@@ -4,6 +4,8 @@ from __future__ import annotations
 import inspect
 from types import SimpleNamespace
 
+import tabs.tab_so_sanh_ky as tab_so_sanh_ky
+import tabs.tab_upload_khnv as tab_upload_khnv
 from tabs.tab_upload_khnv import _upload_toan_cn as upload_toan_cn
 
 
@@ -68,3 +70,12 @@ def test_render_cdto_toan_cn_co_status_va_luu_ket_qua_truoc_rerun():
     assert 'with st.status("📤 Đang upload CDTOTKVV toàn CN..."' in source
     assert "st.session_state[_CDTO_SS_RESULT] = {" in source
     assert source.index("st.session_state[_CDTO_SS_RESULT] = {") < source.index("st.rerun()")
+
+
+def test_quan_ly_snapshot_nam_trong_upload_khong_nam_trong_so_sanh_ky():
+    source_upload = inspect.getsource(tab_upload_khnv.render)
+    source_so_sanh = inspect.getsource(tab_so_sanh_ky.render)
+
+    assert '"🧭 Snapshot kỳ"' in source_upload
+    assert "render_snapshot_management(username)" in source_upload
+    assert "🧭 Quản lý snapshot" not in source_so_sanh

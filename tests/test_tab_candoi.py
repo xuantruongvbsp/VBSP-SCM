@@ -494,6 +494,22 @@ def test_export_tien_gui_tinh_doc_lap_voi_subtab_tong_quan():
     assert calculated["Hiện tại (triệu đồng)"] == 70
 
 
+def test_export_dung_nhan_moc_so_sanh_thay_vi_hardcode_nam_truoc():
+    df_summary, _ = tab_candoi._build_export_frames(
+        [_row("Tổng dư nợ", 100)],
+        [_row("Tổng dư nợ", 80)],
+        1_000_000,
+        1_000_000,
+        True,
+        "KH giao",
+        "Hiện tại",
+    )
+
+    assert "Tăng/giảm so với KH giao (triệu đồng)" in df_summary.columns
+    assert "Tỷ lệ % so với KH giao" in df_summary.columns
+    assert not any("năm trước" in col.lower() for col in df_summary.columns)
+
+
 def test_export_prev_month_rong_khong_them_cot_thang_truoc():
     rows_ht = [
         _row("Tổng huy động vốn", 100),

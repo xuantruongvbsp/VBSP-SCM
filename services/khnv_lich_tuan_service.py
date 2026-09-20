@@ -16,8 +16,8 @@ from config import TEN_CHI_NHANH_HIEN_THI
 logger = get_logger(__name__)
 
 SECTION_LABELS: list[tuple[str, str]] = [
-    ("cong_tac_td", "1. Công tác tín dụng chi nhánh tỉnh"),
-    ("dia_ban_hs", "2. Địa bàn 09 phường do Hội sở tỉnh kiêm nhiệm"),
+    ("cong_tac_td", "1. Công tác tín dụng chi nhánh thành phố"),
+    ("dia_ban_hs", "2. Địa bàn 09 phường do Hội sở thành phố kiêm nhiệm"),
     ("noi_dung_khac", "3. Nội dung công việc khác"),
 ]
 
@@ -31,16 +31,16 @@ MAU_NOI_DUNG_MAC_DINH = {
         "  + Phân tích nguyên nhân, có giải pháp xử lý NQH, nợ khoanh, hộ KHĐ.\n"
         "  + Đôn đốc CT-XH nâng cao chất lượng ủy thác, bình xét, kiểm tra.\n"
         "- Chủ động rà soát, chỉnh sửa tồn tại theo kết luận kiểm tra.\n"
-        "- Các nội dung công việc khác theo chỉ đạo của BGĐ CN tỉnh."
+        "- Các nội dung công việc khác theo chỉ đạo của BGĐ CN thành phố."
     ),
     "dia_ban_hs": (
         "- Làm việc với UBND các phường để sớm được chuyển vốn ủy thác.\n"
         "- Huy động tiền gửi; giải ngân các chỉ tiêu kế hoạch dư nợ.\n"
         "- Xử lý nợ đến hạn; đôn đốc thu hồi NQH, nợ khoanh.\n"
         "- Đôn đốc CT-XH cấp xã nâng cao chất lượng hoạt động ủy thác.\n"
-        "- Các nội dung công việc khác theo chỉ đạo của BGĐ CN tỉnh."
+        "- Các nội dung công việc khác theo chỉ đạo của BGĐ CN thành phố."
     ),
-    "noi_dung_khac": "- Các nội dung công việc khác theo chỉ đạo của BGĐ CN tỉnh.",
+    "noi_dung_khac": "- Các nội dung công việc khác theo chỉ đạo của BGĐ CN thành phố.",
 }
 
 

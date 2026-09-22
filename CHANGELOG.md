@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## [2026-09-20] — Đồng bộ mã Điểm giao dịch từ file master BCQUERY
+- `config.py` — sinh lại `DGD_MA_MAP` từ `Danh sách điểm giao dịch.XLSX`/sheet `BCQUERY`; sửa các mã/tên lệch trong `DGD_DANH_SACH` như Bửu Hòa, Tân Hiệp 3, Hố Nai 3, Xuân Hưng/Xuân Hòa và Dak Lua.
+- `tests/test_config.py` — thêm regression khóa mapping Hội sở, chặn `DGD_DANH_SACH` thiếu/trùng mã và bảo đảm mọi mã lịch tồn tại trong `DGD_MA_MAP`.
+- `BUGMAP.md` — ghi nhận lỗi lệch nguồn mã Điểm giao dịch giữa `DGD_MA_MAP` và `DGD_DANH_SACH`.
+
+## [2026-09-20] — Hoàn thiện fix upload toàn Chi nhánh dùng calamine
+- `services/upload_service.py` — bổ sung thật `_doc_excel_bytes()` và chuyển `tach_file_hstd_toan_cn()` sang helper đọc nhanh; giữ fallback openpyxl khi thiếu calamine.
+- `tabs/tab_upload_khnv/_upload_toan_cn.py` — bổ sung `_doc_excel_nhanh()`, preview HSTD đọc bằng helper nhanh và lưu `pgd_map` để upload không tách lại.
+- `tests/test_hstd_toan_cn.py` — thêm regression bắt lỗi helper thiếu, HSTD không tái dùng `pgd_map`, và UI preview không lưu `pgd_map`.
+- `BUGMAP.md` — ghi nhận lỗi compile xanh nhưng runtime upload GQVL/HSTD lỗi do helper thiếu và preview không lưu state.
+
+## [2026-09-20] — Tăng tốc upload toàn Chi nhánh (calamine + tái dùng pgd_map)
+- `services/upload_service.py` — thêm `_doc_excel_bytes()` (calamine fallback openpyxl); `tach_file_hstd_toan_cn`/`tach_file_gqvl_toan_cn` đọc file bằng calamine thay openpyxl; `xu_ly_hstd_toan_cn`/`xu_ly_gqvl_toan_cn` nhận `pgd_map` tùy chọn để không tách lại file.
+- `tabs/tab_upload_khnv/_upload_toan_cn.py` — preview đếm dòng bằng calamine; lưu `pgd_map` vào preview và truyền xuống khi upload (HSTD/GQVL), bỏ tách file lần 2.
+
 ## [2026-09-20] — Khóa an toàn upload HSTD toàn Chi nhánh
 - `services/upload_service.py` — chuẩn hóa alias ở cột `Tên PGD`, báo tên không nhận diện, bắt buộc đúng đủ 22 đơn vị trước khi ghi và rollback toàn bộ file `hstd_khnv` nếu một lần ghi thất bại.
 - `tabs/tab_upload_khnv/_upload_toan_cn.py` — chỉ nhận `.xlsx`, nhận diện lại file theo hash nội dung, khóa nút upload khi thiếu đơn vị và chỉ đưa vào hàng chờ merge sau khi lưu đủ 22/22.

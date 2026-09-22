@@ -110,6 +110,35 @@ def test_xu_ly_hstd_du_22_ghi_tron_bo_va_tra_duong_dan(monkeypatch, tmp_path):
     assert not list((tmp_path / "cache").glob("hstd_cn_backup_*"))
 
 
+def test_xu_ly_hstd_dung_pgd_map_co_san_khong_tach_lai(monkeypatch, tmp_path):
+    ds_don_vi = [DON_VI_CHI_NHANH] + DS_PGD
+    pgd_map = {ten: f"preview-{index}".encode() for index, ten in enumerate(ds_don_vi)}
+    paths = {ten: tmp_path / f"dv-{index}" / "hstd_khnv.xlsx" for index, ten in enumerate(ds_don_vi)}
+    monkeypatch.setattr(upload_service, "CACHE_DIR", tmp_path / "cache")
+    monkeypatch.setattr(
+        upload_service,
+        "tach_file_hstd_toan_cn",
+        lambda _bytes: pytest.fail("Không được tách lại khi đã có pgd_map từ preview"),
+    )
+    monkeypatch.setattr(upload_service, "duong_dan_pgd", lambda ten, _loai: str(paths[ten]))
+
+    result = upload_service.xu_ly_hstd_toan_cn(b"fake", pgd_map=pgd_map)
+
+    assert set(result) == set(ds_don_vi)
+    assert all(item.thanh_cong for item in result.values())
+    assert {ten: path.read_bytes() for ten, path in paths.items()} == pgd_map
+
+
+def test_helper_doc_excel_nhanh_ton_tai_va_doc_duoc_bytes():
+    file_bytes = _tao_hstd([{COT_TEN_PGD: DON_VI_CHI_NHANH, "Số khế ước": "001"}])
+
+    df_service = upload_service._doc_excel_bytes(file_bytes, sheet_name="BCQUERY", header=4)
+    df_ui = _upload_toan_cn._doc_excel_nhanh(file_bytes, sheet_name="BCQUERY", header=4)
+
+    assert COT_TEN_PGD in df_service.columns
+    assert COT_TEN_PGD in df_ui.columns
+
+
 def test_ui_chi_nhan_xlsx_va_khoa_upload_khi_thieu_don_vi():
     source = inspect.getsource(_upload_toan_cn.render_hstd_toan_cn)
 
@@ -117,3 +146,5 @@ def test_ui_chi_nhan_xlsx_va_khoa_upload_khi_thieu_don_vi():
     assert "hashlib.sha256(uploaded_bytes).hexdigest()" in source
     assert "disabled=not du_22_don_vi" in source
     assert "if so_ok != tong_don_vi:" in source
+    assert '"pgd_map": pgd_map' in source
+    assert "_doc_excel_nhanh(" in source

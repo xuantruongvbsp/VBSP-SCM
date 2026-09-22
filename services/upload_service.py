@@ -70,6 +70,22 @@ _FILE_WRITE_LOCK = threading.RLock()
 
 _BAD_VALS = {"nan", "None", "<NA>", "NaT"}
 
+
+def _doc_excel_bytes(
+    file_bytes: bytes,
+    *,
+    sheet_name: str | int = 0,
+    header: int | None = 0,
+    **kwargs,
+) -> pd.DataFrame:
+    """Đọc Excel từ bytes bằng calamine, fallback openpyxl khi runtime chưa hỗ trợ."""
+    read_kwargs = {"sheet_name": sheet_name, "header": header, **kwargs}
+    try:
+        return pd.read_excel(BytesIO(file_bytes), engine="calamine", **read_kwargs)
+    except ImportError:
+        return pd.read_excel(BytesIO(file_bytes), engine="openpyxl", **read_kwargs)
+
+
 # ── Hằng số kiểm tra ─────────────────────────────────────────────────────────
 
 EXTS_CHOPHEP: set[str] = {".xlsx", ".xls", ".XLSX", ".XLS"}
@@ -963,7 +979,7 @@ def tach_file_gqvl_toan_cn(
     from io import BytesIO
     from config import COT_SO_KU, COT_TEN_PGD as _COT_PGD
 
-    df = pd.read_excel(BytesIO(file_bytes), sheet_name="Sheet1", header=7, engine="openpyxl")
+    df = _doc_excel_bytes(file_bytes, sheet_name="Sheet1", header=7)
     df = df.iloc[:, 1:].dropna(how="all").iloc[1:].reset_index(drop=True)
     df = df.rename(columns=GQVL_COT_MAP)
 
@@ -1032,17 +1048,20 @@ def xu_ly_nq11_toan_cn(file_bytes: bytes) -> dict[str, "KetQuaUpload"]:
 def xu_ly_gqvl_toan_cn(
     file_bytes: bytes,
     df_hstd: pd.DataFrame | None = None,
+    pgd_map: dict[str, bytes] | None = None,
 ) -> dict[str, "KetQuaUpload"]:
     """
     Tách file GQVL toàn CN và lưu cho từng PGD.
     Trả về {ten_pgd: KetQuaUpload}.
+    pgd_map: nếu đã tách sẵn ở bước preview thì truyền vào để bỏ qua bước tách lặp lại.
     """
     from data.pgd import luu_file_pgd
 
-    try:
-        pgd_map = tach_file_gqvl_toan_cn(file_bytes, df_hstd=df_hstd)
-    except Exception as e:  # conv: skip — trả về KetQuaUpload thay vì raise
-        return {"_loi_doc": KetQuaUpload(False, f"Lỗi đọc/tách file GQVL: {e}")}
+    if pgd_map is None:
+        try:
+            pgd_map = tach_file_gqvl_toan_cn(file_bytes, df_hstd=df_hstd)
+        except Exception as e:  # conv: skip — trả về KetQuaUpload thay vì raise
+            return {"_loi_doc": KetQuaUpload(False, f"Lỗi đọc/tách file GQVL: {e}")}
 
     ket_qua: dict[str, KetQuaUpload] = {}
     for ten_pgd, pgd_bytes in pgd_map.items():
@@ -1071,7 +1090,7 @@ def tach_file_hstd_toan_cn(file_bytes: bytes) -> dict[str, bytes]:
     from config import COT_TEN_PGD as _COT_PGD
     from services.file_detection_service import ten_doc_ve_don_vi_chuan
 
-    df = pd.read_excel(BytesIO(file_bytes), sheet_name="BCQUERY", header=4, engine="openpyxl")
+    df = _doc_excel_bytes(file_bytes, sheet_name="BCQUERY", header=4)
     # Bỏ cột đầu tiên (BoQua)
     df = df.iloc[:, 1:].dropna(how="all").reset_index(drop=True)
 
@@ -1116,15 +1135,21 @@ def tach_file_hstd_toan_cn(file_bytes: bytes) -> dict[str, bytes]:
     return pgd_map
 
 
-def xu_ly_hstd_toan_cn(file_bytes: bytes, username: str = "system") -> dict[str, "KetQuaUpload"]:
+def xu_ly_hstd_toan_cn(
+    file_bytes: bytes,
+    username: str = "system",
+    pgd_map: dict[str, bytes] | None = None,
+) -> dict[str, "KetQuaUpload"]:
     """
     Tách file HSTD toàn CN và lưu cho từng PGD (dưới dạng hstd_khnv — luồng Phòng KH-NV).
     Trả về {ten_pgd: KetQuaUpload}. Caller phải ghi audit sau khi nhận kết quả.
+    pgd_map: nếu đã tách sẵn ở bước preview thì truyền vào để bỏ qua bước tách lặp lại.
     """
-    try:
-        pgd_map = tach_file_hstd_toan_cn(file_bytes)
-    except Exception as e:  # conv: skip — trả về KetQuaUpload thay vì raise
-        return {"_loi_doc": KetQuaUpload(False, f"Lỗi đọc/tách file HSTD: {e}")}
+    if pgd_map is None:
+        try:
+            pgd_map = tach_file_hstd_toan_cn(file_bytes)
+        except Exception as e:  # conv: skip — trả về KetQuaUpload thay vì raise
+            return {"_loi_doc": KetQuaUpload(False, f"Lỗi đọc/tách file HSTD: {e}")}
 
     ds_bat_buoc = [DON_VI_CHI_NHANH] + DS_PGD
     thieu = [ten_pgd for ten_pgd in ds_bat_buoc if ten_pgd not in pgd_map]

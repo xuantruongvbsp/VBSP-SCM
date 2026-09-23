@@ -189,8 +189,7 @@
 | `tabs/tab_tien_do_nop_settings.py` | UI cài đặt thời hạn cho tab Tiến độ nộp báo cáo. | `render_settings()` |
 | `tabs/tab_tong_hop_cv.py` | Dashboard tổng hợp — kết hợp Tiến độ Công việc + Nhiệm vụ định kỳ. | `render()` |
 | `tabs/tab_tongquan.py` | Tab Tổng quan. | `render()` |
-| `tabs/tab_tracuu.py` | Tab Tra cứu hồ sơ — nâng cao. | `render()` |
-| `tabs/tab_tracuu_v2.py` | Tab Tra cứu hồ sơ — Phiên bản 2.0. | `render()` |
+| `tabs/tab_tracuu_v2.py` | Tab Tra cứu hồ sơ khách hàng (v2) — search đa từ khóa, preset cột, group theo KH, dialog chi tiết + ghi chú CBTD, audit/mask PII, biểu đồ, lưu bộ lọc. | `render()` |
 | `tabs/tab_trang_chu_pgd.py` | Trang chủ dashboard PGD — KPI cards, truy cập nhanh, cảnh báo, nhiệm vụ. | `render()` |
 | `tabs/tab_trang_thai_nguon.py` | tab_trang_thai_nguon.py | `render()` |
 | `tabs/tab_upload_pgd.py` | Tab Upload Dữ liệu — Hỗ trợ địa bàn (PGD tự upload file của mình). | `render()` |

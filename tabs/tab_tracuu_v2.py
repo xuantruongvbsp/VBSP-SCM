@@ -13,6 +13,7 @@ import re
 import streamlit as st
 import pandas as pd
 from collections import deque
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 import db
@@ -29,6 +30,7 @@ from config import (
     COT_NOI_CAP_CMND, COT_NGAY_CAP_CMND, COT_TINH_TRANG,
     COT_TEN_TO, COT_TEN_VC, COT_TEN_HSSV, COT_DIA_CHI,
     COT_LAI_TON, COT_SO_DU_TG, COT_PHAN_LOAI, COT_NGAY_DH,
+    COT_LAI_TON_QH, COT_SO_LAN_GH, COT_MA_NHA_DAU_TU, COT_NGAY_HH_KHOANH,
 )
 from utils import fmt_tien, fmt_ty, xuat_excel
 from tabs.base_tab import TabContext
@@ -123,18 +125,29 @@ def _so_khac_nhau(df_kia: pd.DataFrame | None, so_ku: str) -> bool:
     return str(so_ku).strip() in set(df_kia[col].dropna().astype(str).str.strip())
 
 
+# Whitelist cột NQ11/GQVL hiển thị trong dialog (C6 — tránh dump 30+ cột gây tràn).
+_CT_PHU_WHITELIST = (
+    "dư nợ", "nợ", "vốn", "tiền", "gốc", "lãi", "giải ngân", "khoanh",
+    "quá hạn", "đến hạn", "ngày", "chương trình", "mục đích", "địa chỉ",
+    "xã", "huyện", "tỉnh", "mã", "số", "tình trạng", "trạng thái",
+)
+_CT_PHU_MAX_COLS = 12
+
+
 def _render_chi_tiet_phu(df_kia: pd.DataFrame, so_ku: str, money_kw: tuple[str, ...]) -> None:
-    """Render chi tiết NQ11/GQVL của 1 hồ sơ dạng 2 cột gọn."""
+    """Render chi tiết NQ11/GQVL của 1 hồ sơ dạng 2 cột gọn (whitelist — C6)."""
     col = "Số khế ước" if "Số khế ước" in df_kia.columns else COT_SO_KU
     match = df_kia[df_kia[col].astype(str).str.strip() == str(so_ku).strip()]
     if match.empty:
         return
     row = match.iloc[0]
     skip = {"số khế ước", "mã kh", "mã khách hàng", "tên kh", "tên khách hàng"}
+    # Ưu tiên cột theo whitelist; nếu không khớp → giữ cột đầu tiên (cap).
+    all_cols = [c for c in match.columns if c.lower().strip() not in skip]
+    wl_cols = [c for c in all_cols if any(kw in c.lower() for kw in _CT_PHU_WHITELIST)]
+    show_cols = (wl_cols or all_cols)[:_CT_PHU_MAX_COLS]
     items: list[tuple[str, str]] = []
-    for c in match.columns:
-        if c.lower().strip() in skip:
-            continue
+    for c in show_cols:
         val = row.get(c)
         if val is None or (isinstance(val, float) and pd.isna(val)):
             continue
@@ -149,6 +162,9 @@ def _render_chi_tiet_phu(df_kia: pd.DataFrame, so_ku: str, money_kw: tuple[str, 
         c1, c2 = st.columns(2)
         for i, (k, v) in enumerate(items):
             (c1 if i % 2 == 0 else c2).markdown(f"**{k}:** {v}")
+        if len(all_cols) > len(show_cols):
+            st.caption(f"… và {len(all_cols) - len(show_cols)} trường khác (ẩn để gọn giao diện).")
+
 
 
 def _tao_pdf_ho_so(
@@ -340,6 +356,8 @@ def _render_kpi_va_xuat(
     qh_count: int,
     tong_no: float,
     username: str,
+    mask_pii: bool = False,
+    chart_figs: list | None = None,
 ) -> None:
     """KPI hàng đầu + nút xuất Excel/PDF."""
     kpi_row(
@@ -359,9 +377,24 @@ def _render_kpi_va_xuat(
 
     with col_xl:
         if not df_f.empty and len(df_f) <= _MAX_EXPORT_EXCEL:
+            def _make_excel() -> bytes:
+                # Mask PII khi toggle bật (3.6) + sheet "Ghi chú bảo mật".
+                df_xuat = _mask_df_pii(df_f) if mask_pii else df_f
+                sheets = {"KetQua_TraCuu": df_xuat}
+                sheets["Ghi_chu_bao_mat"] = pd.DataFrame(
+                    [
+                        ("Người xuất", username),
+                        ("Thời điểm", datetime.now().strftime("%d/%m/%Y %H:%M:%S")),
+                        ("Số dòng", f"{len(df_xuat):,}"),
+                        ("Ẩn CMND/SĐT", "Có" if mask_pii else "Không"),
+                    ],
+                    columns=["Mục", "Giá trị"],
+                )
+                return xuat_excel(sheets)
+
             st.download_button(
                 "📊 Excel",
-                data=xuat_excel({"KetQua_TraCuu": df_f}),
+                data=_make_excel,
                 file_name="ket_qua_tra_cuu.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True,
@@ -383,10 +416,12 @@ def _render_kpi_va_xuat(
 
             def _make_pdf() -> bytes:
                 # Lazy: chỉ tạo PDF khi user bấm tải (tránh tạo PDF mỗi rerun — B3).
+                # Đính kèm biểu đồ phân bố (3.7) nếu có.
                 return xuat_pdf_co_chart(
                     df=df_f[pdf_cols],
                     tieu_de="KẾT QUẢ TRA CỨU HỒ SƠ",
                     nguoi_xuat=username,
+                    figs=chart_figs,
                     cols_tien=cols_tien,
                     them_dong_tong=False,
                 )
@@ -404,6 +439,7 @@ def _render_kpi_va_xuat(
             st.button(lbl, disabled=True, use_container_width=True, key="tc_export_pdf")
 
 
+
 # Danh mục cột hiển thị: (cột nguồn, nhãn, is_money) — is_money → chia 1e6 giữ numeric
 _VIEW_CATALOG = [
     (COT_SO_KU, "Số khế ước", False),
@@ -415,11 +451,17 @@ _VIEW_CATALOG = [
     (COT_TONG_DU_NO, "Tổng dư nợ (triệu)", True),
     (COT_LAI_TON, "Lãi tồn (triệu)", True),
     (COT_DU_NO_QH, "Dư nợ QH (triệu)", True),
+    (COT_LAI_TON_QH, "Lãi tồn QH (triệu)", True),
+    (COT_DU_NO_KHOANH, "Dư nợ khoanh (triệu)", True),
     (COT_SO_DU_TG, "Số dư TK 105 (triệu)", True),
+    (COT_MUC_VAY, "Mức vay (triệu)", True),
     (COT_PHAN_LOAI, "Phân loại", False),
     (COT_NGAY_VAY, "Ngày vay", False),
     (COT_NGAY_DH, "Ngày đến hạn", False),
+    (COT_NGAY_HH_KHOANH, "Ngày HH khoanh", False),
+    (COT_SO_LAN_GH, "Số lần GH", False),
     (COT_NGUON_VON, "Nguồn vốn", False),
+    (COT_MA_NHA_DAU_TU, "Mã NĐT", False),
     (COT_TINH_TRANG, "Tình trạng", False),
 ]
 
@@ -427,6 +469,48 @@ _DEFAULT_VISIBLE = {
     COT_SO_KU, COT_TEN_KH, COT_TEN_PGD, COT_TEN_XA, COT_TEN_TO, COT_TEN_CT,
     COT_TONG_DU_NO, COT_LAI_TON, COT_SO_DU_TG, COT_TINH_TRANG,
 }
+
+# Preset cột (3.3): mỗi preset = tập cột nguồn bổ sung vào bộ cơ bản.
+_COLUMN_PRESETS: dict[str, set] = {
+    "Cơ bản": set(_DEFAULT_VISIBLE),
+    "Đến hạn": set(_DEFAULT_VISIBLE) | {COT_NGAY_VAY, COT_NGAY_DH, COT_SO_LAN_GH},
+    "Quá hạn": set(_DEFAULT_VISIBLE) | {COT_DU_NO_QH, COT_LAI_TON_QH, COT_PHAN_LOAI},
+    "NQ11 / GQVL": set(_DEFAULT_VISIBLE) | {COT_NGUON_VON, COT_MA_NHA_DAU_TU},
+    "Huy động": set(_DEFAULT_VISIBLE) | {COT_SO_DU_TG, COT_LAI_TON},
+    "Khoanh nợ": set(_DEFAULT_VISIBLE) | {COT_DU_NO_KHOANH, COT_NGAY_HH_KHOANH},
+}
+
+
+def _sort_mac_dinh(df_x: pd.DataFrame) -> pd.DataFrame:
+    """Sắp xếp mặc định: Dư nợ QH DESC, Tổng dư nợ DESC (3.3).
+
+    Giữ nguyên index gốc để map vị trí dòng → hồ sơ không đổi.
+    """
+    by: list[str] = []
+    asc: list[bool] = []
+    tmp = df_x
+    if COT_DU_NO_QH in tmp.columns:
+        tmp = tmp.assign(__qh=pd.to_numeric(tmp[COT_DU_NO_QH], errors="coerce").fillna(0))
+        by.append("__qh")
+        asc.append(False)
+    if COT_TONG_DU_NO in tmp.columns:
+        tmp = tmp.assign(__dn=pd.to_numeric(tmp[COT_TONG_DU_NO], errors="coerce").fillna(0))
+        by.append("__dn")
+        asc.append(False)
+    if not by:
+        return df_x
+    return tmp.sort_values(by=by, ascending=asc, kind="mergesort").drop(columns=by)
+
+
+def _mask_df_pii(df_x: pd.DataFrame) -> pd.DataFrame:
+    """Che CMND/SĐT trên bản sao DataFrame trước khi xuất Excel (3.6)."""
+    out = df_x.copy()
+    if COT_CMND in out.columns:
+        out[COT_CMND] = out[COT_CMND].map(_mask_cmnd)
+    if COT_SDT in out.columns:
+        out[COT_SDT] = out[COT_SDT].map(_mask_sdt)
+    return out
+
 
 
 def _build_bang_ket_qua(df_f: pd.DataFrame, visible_cols: set | None = None) -> tuple[pd.DataFrame, list[str]]:
@@ -487,28 +571,27 @@ def _render_tra_cuu_gan_day() -> None:
                 st.rerun()
 
 
-def _render_charts(df_f: pd.DataFrame) -> None:
-    """4 biểu đồ phân bố kết quả (dùng plotly)."""
+def _build_charts(df_f: pd.DataFrame) -> list[tuple["go.Figure", str]]:
+    """Dựng 4 biểu đồ phân bố (3.7) — trả về list (fig, tiêu đề) để render + đính kèm PDF."""
+    figs: list[tuple[go.Figure, str]] = []
     if df_f.empty or COT_TONG_DU_NO not in df_f.columns:
-        st.caption("Không có dữ liệu để vẽ biểu đồ.")
-        return
+        return figs
     _dn = pd.to_numeric(df_f[COT_TONG_DU_NO], errors="coerce").fillna(0)
     _base = df_f.assign(_dn=_dn)
-    c1, c2 = st.columns(2)
 
     if COT_TEN_CT in df_f.columns:
         _g = _base.groupby(COT_TEN_CT)["_dn"].sum().sort_values(ascending=False).head(10)
         if len(_g):
             fig = go.Figure(go.Bar(x=_g.values, y=_g.index, orientation="h"))
             fig.update_layout(height=320, margin=dict(l=10, r=10, t=36, b=10), title="Dư nợ theo Chương trình")
-            c1.plotly_chart(fig, use_container_width=True)
+            figs.append((fig, "Dư nợ theo Chương trình"))
 
     if COT_TEN_PGD in df_f.columns:
         _g = _base.groupby(COT_TEN_PGD)["_dn"].sum().sort_values(ascending=True)
         if len(_g):
             fig = go.Figure(go.Bar(x=_g.values, y=_g.index, orientation="h"))
             fig.update_layout(height=320, margin=dict(l=10, r=10, t=36, b=10), title="Dư nợ theo PGD")
-            c2.plotly_chart(fig, use_container_width=True)
+            figs.append((fig, "Dư nợ theo PGD"))
 
     if COT_NGUON_VON in df_f.columns:
         _nv = _base.assign(_nv=df_f[COT_NGUON_VON].map(_hien_thi_nguon_von))
@@ -517,14 +600,28 @@ def _render_charts(df_f: pd.DataFrame) -> None:
         if len(_g):
             fig = go.Figure(go.Pie(labels=_g.index, values=_g.values, hole=0.45))
             fig.update_layout(height=320, margin=dict(l=10, r=10, t=36, b=10), title="Dư nợ theo Nguồn vốn")
-            c1.plotly_chart(fig, use_container_width=True)
+            figs.append((fig, "Dư nợ theo Nguồn vốn"))
 
     if COT_NGAY_VAY in df_f.columns:
         _yrs = pd.to_datetime(df_f[COT_NGAY_VAY], errors="coerce").dt.year.dropna().astype(int)
         if len(_yrs):
             fig = go.Figure(go.Histogram(x=_yrs, nbinsx=min(20, _yrs.nunique())))
             fig.update_layout(height=320, margin=dict(l=10, r=10, t=36, b=10), title="Phân bố theo năm vay")
-            c2.plotly_chart(fig, use_container_width=True)
+            figs.append((fig, "Phân bố theo năm vay"))
+
+    return figs
+
+
+def _render_charts(df_f: pd.DataFrame, chart_figs: list | None = None) -> None:
+    """Render 4 biểu đồ theo lưới 2×2 (dùng plotly)."""
+    figs = chart_figs if chart_figs is not None else _build_charts(df_f)
+    if not figs:
+        st.caption("Không có dữ liệu để vẽ biểu đồ.")
+        return
+    c1, c2 = st.columns(2)
+    for i, (fig, _title) in enumerate(figs):
+        (c1 if i % 2 == 0 else c2).plotly_chart(fig, use_container_width=True)
+
 
 
 def _build_theo_khach_hang(df_f: pd.DataFrame) -> pd.DataFrame:
@@ -617,10 +714,7 @@ def render(tab: "DeltaGenerator", **kwargs) -> None:
         if _search_kw:
             _kw_masked = _mask_kw_for_audit(_search_kw)
             if _kw_masked and _kw_masked != st.session_state.get("tc2_last_audited"):
-                try:
-                    db.ghi_audit(username, "tra_cuu_kh", f"kw={_kw_masked}; n={len(df_f)}")
-                except Exception:
-                    pass
+                db.ghi_audit(username, "tra_cuu_kh", f"kw={_kw_masked}; n={len(df_f)}")
                 st.session_state["tc2_last_audited"] = _kw_masked
             _them_tra_cuu_gan_day(_search_kw, len(df_f))
 
@@ -633,7 +727,12 @@ def render(tab: "DeltaGenerator", **kwargs) -> None:
         gqvl_count = int(df_f["__is_gqvl"].fillna(False).sum()) if "__is_gqvl" in df_f.columns else 0
 
         st.divider()
-        _render_kpi_va_xuat(df_f, nq11_count, gqvl_count, qh_count, tong_no, username)
+        # Dựng biểu đồ 1 lần — dùng cho cả expander lẫn đính kèm PDF (3.7).
+        chart_figs = _build_charts(df_f)
+        _render_kpi_va_xuat(
+            df_f, nq11_count, gqvl_count, qh_count, tong_no, username,
+            mask_pii=mask_pii, chart_figs=chart_figs,
+        )
 
         # ── Bảng kết quả ────────────────────────────────────────────────
         st.divider()
@@ -649,7 +748,8 @@ def render(tab: "DeltaGenerator", **kwargs) -> None:
         )
 
         with st.expander("📊 Phân bố kết quả", expanded=False):
-            _render_charts(df_f)
+            _render_charts(df_f, chart_figs)
+
 
         # ── Chế độ "Theo khách hàng" ────────────────────────────────────
         if _mode == "Theo khách hàng":
@@ -671,19 +771,32 @@ def render(tab: "DeltaGenerator", **kwargs) -> None:
                 st.dataframe(_ds_ku[_ku_cols], hide_index=True, use_container_width=True)
             return
 
-        # ── Chế độ "Theo khế ước": chọn cột hiển thị ────────────────────
-        _all_labels = {src: label for src, label, _ in _VIEW_CATALOG if src in df_f.columns}
-        _def_labels = [label for src, label, _ in _VIEW_CATALOG if src in _DEFAULT_VISIBLE and src in df_f.columns]
-        _sel_labels = st.multiselect(
-            "Cột hiển thị",
-            options=list(_all_labels.values()),
-            default=_def_labels,
-            key="tc2_cols",
-        )
-        _visible = {src for src, label, _ in _VIEW_CATALOG if label in _sel_labels}
+        # ── Chế độ "Theo khế ước": preset cột + sắp xếp mặc định ──────────
+        _avail_src = [src for src, _l, _m in _VIEW_CATALOG if src in df_f.columns]
+        _preset_names = [
+            p for p in _COLUMN_PRESETS
+            if any(s in _avail_src for s in _COLUMN_PRESETS[p])
+        ] + ["Tùy chỉnh"]
+        _preset = st.selectbox("Preset cột", options=_preset_names, index=0, key="tc2_preset")
+        if _preset == "Tùy chỉnh":
+            _all_labels = {src: label for src, label, _ in _VIEW_CATALOG if src in df_f.columns}
+            _def_labels = [label for src, label, _ in _VIEW_CATALOG if src in _DEFAULT_VISIBLE and src in df_f.columns]
+            _sel_labels = st.multiselect(
+                "Cột hiển thị",
+                options=list(_all_labels.values()),
+                default=_def_labels,
+                key="tc2_cols",
+            )
+            _visible = {src for src, label, _ in _VIEW_CATALOG if label in _sel_labels}
+        else:
+            _visible = {src for src in _COLUMN_PRESETS[_preset] if src in df_f.columns}
+
+        # Sắp xếp mặc định: Dư nợ QH DESC, Tổng dư nợ DESC (3.3) — dùng cho cả bảng lẫn map dòng.
+        df_tab = _sort_mac_dinh(df_f)
 
         st.caption("💡 Bấm chọn một dòng để xem chi tiết hồ sơ.")
-        df_view, money_labels = _build_bang_ket_qua(df_f, _visible)
+        df_view, money_labels = _build_bang_ket_qua(df_tab, _visible)
+
         if df_view.empty:
             st.info("Không có cột nào để hiển thị. Chọn ít nhất 1 cột.")
             return
@@ -726,11 +839,11 @@ def render(tab: "DeltaGenerator", **kwargs) -> None:
         if event and getattr(event, "selection", None):
             rows = event.selection.get("rows", [])
         if rows:
-            pos = rows[0] + start  # map vị trí chunk → vị trí gốc trong df_f
-            if pos < len(df_f):
-                # Map theo index của df_f (không theo Số KU) — tránh mở sai hồ sơ
-                # khi Số KU trùng hoặc rỗng (A4/A5).
-                hs_selected = df_f.iloc[pos]
+            pos = rows[0] + start  # map vị trí chunk → vị trí trong df_tab (đã sort)
+            if pos < len(df_tab):
+                # Map theo vị trí của df_tab (không theo Số KU) — tránh mở sai hồ sơ
+                # khi Số KU trùng hoặc rỗng (A4/A5). df_tab cùng thứ tự với df_view.
+                hs_selected = df_tab.iloc[pos]
                 so_ku = str(hs_selected.get(COT_SO_KU, "") or "").strip()
                 ten_selected = str(hs_selected.get(COT_TEN_KH, "") or "").strip()
                 col_info, col_open = st.columns([4, 1])

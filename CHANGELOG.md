@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## [2026-09-23] — Tra cứu Khách hàng: hoàn tất task còn lại của kế hoạch v3
+- `tabs/tab_tracuu_v2.py` — thêm preset cột (`_COLUMN_PRESETS`: Cơ bản/Đến hạn/Quá hạn/NQ11-GQVL/Huy động/Khoanh nợ/Tùy chỉnh) + mở rộng `_VIEW_CATALOG`; sắp xếp mặc định Dư nợ QH DESC → Tổng dư nợ DESC (`_sort_mac_dinh`, map dòng theo `df_tab`); mask PII CMND/SĐT khi xuất Excel (`_mask_df_pii`) + sheet `Ghi_chu_bao_mat`, Excel lazy; tách `_build_charts()` trả figs → đính kèm PDF (`figs=`); whitelist ≤12 cột NQ11/GQVL trong `_render_chi_tiet_phu` (chống tràn dialog — C6).
+- `components/filter_panel.py` — bật nút 💾 Lưu bộ lọc (A10, bỏ `disabled=True`): `_render_save_filter` Lưu/Áp/Xóa qua `db.ghi_kv` + `db.ghi_audit("luu_bo_loc_tra_cuu")`; `_snapshot_filters`/`_restore_filters`/`_apply_saved_filters` (date↔isoformat, tuple↔list, xóa key `tc_*` rồi rerun); 2 selectbox đến hạn/khoanh đọc `index` từ dict để khôi phục đúng.
+- `tests/test_tracuu_search.py` — thêm 4 test (`_mask_df_pii`, `_sort_mac_dinh`, snapshot/restore round-trip); tổng 11 test pass.
+- `CODE_INDEX.md`, `TEST_COVERAGE.md`, `DELTA.md` — bỏ ref `tab_tracuu.py` (v1 đã xóa), cập nhật mô tả v2 + filter_panel.
+
+## [2026-09-23] — Tra cứu Khách hàng: hoàn thiện (dọn dẹp v1 + test + fix audit)
+- `tabs/tab_tracuu.py` — **XÓA** (dead code v1, chỉ còn test tham chiếu); mọi production đã dùng `tab_tracuu_v2`.
+- `tests/test_tracuu_search.py` — bỏ import `_tim_mem` (v1), thay bằng `_keyword_search_mask`; thêm test multi-token AND/OR, `_detect_keyword_type`, `_mask_cmnd`/`_mask_sdt`.
+- `tests/test_smoke_imports.py` — đổi `tabs.tab_tracuu` → `tabs.tab_tracuu_v2`.
+- `tabs/tab_tracuu_v2.py` — bỏ `try/except: pass` quanh `db.ghi_audit` (ghi_audit đã tự log lỗi nội bộ).
+
 ## [2026-09-23] — Tra cứu Khách hàng: hiệu năng + tính năng mới (Đợt 2 & 3)
 - `components/filter_panel.py` — vectorize `_pre_compute_search_text` (bỏ `.map(lambda)` → `str.normalize` + `str.translate`); tìm kiếm đa từ khóa AND/OR + auto-detect loại từ khóa + mở rộng cột tìm kiếm (HSSV/vợ chồng/tổ/địa chỉ/tổ trưởng/NĐT); thêm bộ lọc phân loại/hội đoàn thể/điểm GD/đến hạn N ngày/khoanh sắp hết hạn/Số dư TK105=0/có gia hạn; slider dư nợ đổi sang đơn vị triệu đồng.
 - `tabs/tab_tracuu_v2.py` — PDF lazy (chỉ tạo khi tải); spinner; ghi chú CBTD (`db.doc_ghi_chu_kv`/`luu_ghi_chu_kv`) trong dialog + liệt kê khế ước khác cùng KH; audit `tra_cuu_kh` (đã mask PII) + toggle ẩn CMND/SĐT; bảng kết quả dùng `NumberColumn` (sort số) + chọn cột hiển thị; chế độ "Theo khách hàng"; biểu đồ phân bố (plotly); lịch sử tra cứu gần đây.

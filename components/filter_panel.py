@@ -10,6 +10,8 @@ import pandas as pd
 from typing import TYPE_CHECKING, Callable
 from datetime import date, datetime
 
+import db
+from data.pgd import pgd_slug
 from config import (
     COT_TEN_PGD, COT_TEN_XA, COT_TEN_THON,
     COT_TEN_CT, COT_NGUON_VON, COT_NGAY_VAY, COT_NGAY_DH,
@@ -243,6 +245,83 @@ def _reset_filter_state(pgd_user: str | None, _max_du_no: float) -> None:
         "filter_khoanh": False,
     }
     st.rerun()
+
+
+def _snapshot_filters(f: dict) -> dict:
+    """Tuần tự hóa bộ lọc để lưu kv_store (date → isoformat, tuple → list)."""
+    out: dict = {}
+    for k, v in f.items():
+        if isinstance(v, (date, datetime)):
+            out[k] = v.isoformat()
+        elif isinstance(v, tuple):
+            out[k] = list(v)
+        else:
+            out[k] = v
+    return out
+
+
+def _restore_filters(snap: dict) -> dict:
+    """Khôi phục bộ lọc từ snapshot (isoformat → date, list → tuple)."""
+    f = dict(snap or {})
+    for dk in ("ngay_vay_from", "ngay_vay_to", "ngay_dh_from", "ngay_dh_to"):
+        v = f.get(dk)
+        if isinstance(v, str) and v:
+            try:
+                f[dk] = date.fromisoformat(v)
+            except ValueError:
+                f[dk] = None
+        else:
+            f[dk] = None
+    dr = f.get("du_no_range")
+    if isinstance(dr, (list, tuple)) and len(dr) == 2:
+        try:
+            f["du_no_range"] = (float(dr[0]), float(dr[1]))
+        except (TypeError, ValueError):
+            f.pop("du_no_range", None)
+    return f
+
+
+def _apply_saved_filters(snap: dict, pgd_user: str | None) -> None:
+    """Áp bộ lọc đã lưu: ghi dict rồi xóa widget key `tc_*` → rerun (widget tự init từ dict)."""
+    if not snap:
+        st.warning("Bộ lọc đã lưu trống.")
+        return
+    restored = _restore_filters(snap)
+    base = dict(st.session_state.get("tracuu_filters", {}))
+    base.update(restored)
+    if pgd_user:
+        base["selected_pgd"] = [pgd_user]
+    st.session_state.tracuu_filters = base
+    for k in list(st.session_state):
+        if k.startswith("tc_") and not k.startswith("tc2_"):
+            del st.session_state[k]
+    st.rerun()
+
+
+def _render_save_filter(pgd_user: str | None) -> None:
+    """Nút 💾 Lưu / ↩️ Áp / 🗑 Xóa bộ lọc (A10) — persist qua kv_store + audit."""
+    username = st.session_state.get("username", "unknown")
+    key = f"tracuu_filter_{pgd_slug(pgd_user) if pgd_user else 'cn'}_{username}"
+    saved = db.doc_kv(key) or {}
+    snap = saved.get("filters") or {}
+    with st.popover("💾 Bộ lọc đã lưu", use_container_width=True):
+        if st.button("💾 Lưu bộ lọc hiện tại", key="tc_save_now", use_container_width=True):
+            _snap = _snapshot_filters(st.session_state.get("tracuu_filters", {}))
+            db.ghi_kv(key, {"filters": _snap}, username)
+            db.ghi_audit(username, "luu_bo_loc_tra_cuu", f"n_filter={sum(1 for v in _snap.values() if v)}")
+            st.success("Đã lưu bộ lọc.")
+            st.rerun()
+        if snap:
+            st.caption("Đã có bộ lọc lưu:")
+            if st.button("↩️ Áp dụng", key="tc_apply_saved", use_container_width=True):
+                _apply_saved_filters(snap, pgd_user)
+            if st.button("🗑 Xóa", key="tc_del_saved", use_container_width=True):
+                db.ghi_kv(key, {"filters": {}}, username)
+                db.ghi_audit(username, "xoa_bo_loc_tra_cuu", f"key={key}")
+                st.success("Đã xóa bộ lọc đã lưu.")
+                st.rerun()
+        else:
+            st.caption("Chưa có bộ lọc nào được lưu.")
 
 
 def render_filter_panel(
@@ -547,19 +626,23 @@ def render_filter_panel(
                 placeholder="Tất cả",
                 key="tc_dgd",
             )
+            _dh_opts = [None, 7, 15, 30, 60, 90]
+            _dh_cur = st.session_state.tracuu_filters.get("den_han_trong")
             den_han_trong = st.selectbox(
                 "Đến hạn trong N ngày",
-                options=[None, 7, 15, 30, 60, 90],
-                index=0,
+                options=_dh_opts,
+                index=_dh_opts.index(_dh_cur) if _dh_cur in _dh_opts else 0,
                 format_func=lambda x: "Tất cả" if x is None else f"{x} ngày",
                 key="tc_den_han_trong",
             )
         
         with col_nv3:
+            _kh_opts = [None, 30, 60, 90]
+            _kh_cur = st.session_state.tracuu_filters.get("khoanh_sap_hh")
             khoanh_sap_hh = st.selectbox(
                 "Khoanh nợ sắp hết hạn (N ngày)",
-                options=[None, 30, 60, 90],
-                index=0,
+                options=_kh_opts,
+                index=_kh_opts.index(_kh_cur) if _kh_cur in _kh_opts else 0,
                 format_func=lambda x: "Tất cả" if x is None else f"{x} ngày",
                 key="tc_khoanh_sap_hh",
             )
@@ -611,7 +694,7 @@ def render_filter_panel(
             if st.button("🔄 Đặt lại", use_container_width=True, key="tc_reset"):
                 _reset_filter_state(pgd_user, _max_du_no)
         with col_save:
-            st.button("💾 Lưu bộ lọc", use_container_width=True, disabled=True, key="tc_save_filter")
+            _render_save_filter(pgd_user)
     
     # ── Xây dựng composite mask (1 Series bool duy nhất, không copy) ──
     mask = pd.Series(True, index=df.index)

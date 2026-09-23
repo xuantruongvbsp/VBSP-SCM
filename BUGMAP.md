@@ -5003,6 +5003,30 @@ def _to_int(val, default=0):
 
 ---
 
+### B109 — Nút "💾 Lưu bộ lọc" Tra cứu bị disabled cứng, không lưu/áp được (A10)
+| | |
+|---|---|
+| **File** | `components/filter_panel.py` → `render_filter_panel()` ~cột `col_save` trong expander; thêm `_snapshot_filters()`, `_restore_filters()`, `_apply_saved_filters()`, `_render_save_filter()` |
+| **Dấu hiệu** | Nút "💾 Lưu bộ lọc" hiện ra nhưng `disabled=True` — user không thể lưu/áp lại bộ lọc đã dùng; bộ lọc mất khi chuyển tab. |
+| **Nguyên nhân** | Chức năng lưu bộ lọc chỉ mới dựng phần UI (placeholder) — chưa có đường ghi kv_store, chưa có nút Áp/Xóa, và giá trị widget (`date`, `tuple`) chưa JSON-serializable nên không thể lưu thẳng. |
+| **Fix** | `_snapshot_filters()` chuẩn hóa `date→isoformat`, `tuple→list` rồi ghi `db.ghi_kv(f"tracuu_filter_{pgd_slug(pgd_user) or 'cn'}_{username}", {"filters": snap}, username)` + `db.ghi_audit(..., "luu_bo_loc_tra_cuu", ...)` NGAY SAU. `_apply_saved_filters()` dùng `_restore_filters()` (ngược: isoformat→date, list→tuple) ghi vào `st.session_state.tracuu_filters`, ép `selected_pgd=[pgd_user]` cho role PGD, xóa mọi key `tc_*` (trừ `tc2_`) rồi `st.rerun()` — tái dùng cơ chế đã kiểm chứng ở B107. Nút Xóa ghi `{"filters": {}}` + audit `xoa_bo_loc_tra_cuu`. Đồng thời sửa 2 selectbox `den_han_trong`/`khoanh_sap_hh` đọc index từ dict thay vì hardcode `index=0` để snapshot áp đúng. |
+| **Test** | Compile + import OK; `tests/test_tracuu_search.py::test_snapshot_restore_filters_roundtrip` PASS |
+| **Ngày fix** | 2026-09-23 |
+
+---
+
+### C43 — Dialog chi tiết NQ11/GQVL tràn màn hình vì dump mọi cột (C6)
+| | |
+|---|---|
+| **File** | `tabs/tab_tracuu_v2.py` → `_render_chi_tiet_phu()`; thêm `_CT_PHU_WHITELIST`, `_CT_PHU_MAX_COLS` |
+| **Dấu hiệu** | Bấm "Chi tiết NQ11/GQVL" → dialog dựng bảng theo toàn bộ cột của DataFrame nguồn (30+ cột, nhiều cột nội bộ/rỗng) → tràn ngang, khó đọc. |
+| **Nguyên nhân** | Hàm hiển thị trực tiếp `df.loc[mask]` không giới hạn cột; nguồn NQ11/GQVL có schema khác HSTD nên số cột không kiểm soát được. |
+| **Fix** | Lọc cột theo `_CT_PHU_WHITELIST` (21 keyword nghiệp vụ) rồi cap `_CT_PHU_MAX_COLS = 12` cột đầu; thêm caption báo số trường bị ẩn để user biết dữ liệu vẫn còn. |
+| **Test** | Compile + import OK |
+| **Ngày fix** | 2026-09-23 |
+
+---
+
 Mỗi khi fix bug, copy template dưới đây và điền vào đúng mục:
 
 ```

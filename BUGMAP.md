@@ -4931,6 +4931,78 @@ def _to_int(val, default=0):
 
 ---
 
+### B106 — Tra cứu không tra được hồ sơ đã tất toán (chỉ dùng df active)
+| | |
+|---|---|
+| **File** | `tabs/tab_tracuu_v2.py` → `render()` ~dòng 376-392 |
+| **Dấu hiệu** | Với role CN, gõ tên khách hàng đã tất toán (dư nợ = 0) không ra kết quả dù dữ liệu có. |
+| **Nguyên nhân** | `render()` chỉ dùng `kwargs["df"]`; app.py gán `df = _loc_hstd_active(df_full)` cho role CN nên đã loại hết hồ sơ dư nợ = 0. `df_full` (toàn bộ) có sẵn trong ctx nhưng không được dùng. |
+| **Fix** | Thêm toggle `tc2_bao_gom_tat_toan` (mặc định bật, chỉ hiện cho role CN khi `df_full` khác `df`): bật → `df_nguon = df_full`, tắt → `df_nguon = df`; truyền `df_nguon` vào `render_filter_panel`. |
+| **Test** | Compile + import OK |
+| **Ngày fix** | 2026-09-23 |
+
+---
+
+### B107 — Nút Reset bộ lọc Tra cứu không hoạt động
+| | |
+|---|---|
+| **File** | `components/filter_panel.py` → `render_filter_panel()` ~dòng 153-180, 227-260, 453-456 |
+| **Dấu hiệu** | Bấm "🔄 Reset"/"🔄 Đặt lại" → widget multiselect/slider/date vẫn giữ giá trị cũ. |
+| **Nguyên nhân** | Chỉ gán lại `st.session_state.tracuu_filters` mà không xóa key widget (`tc_search_kw`, `tc_pgd`, `tc_du_no`...). Streamlit ưu tiên `session_state[key]` của widget hơn `value=`/`default=`. |
+| **Fix** | Thêm `_reset_filter_state()`: xóa trực tiếp mọi key bắt đầu `tc_` (trừ `tc2_`) khỏi `st.session_state`, rồi gán lại dict mặc định và `st.rerun()`. Cả 2 nút Reset cùng dùng helper này. |
+| **Test** | Compile + import OK |
+| **Ngày fix** | 2026-09-23 |
+
+---
+
+### B108 — Slider dư nợ Tra cứu crash sau khi upload kỳ mới (value out of range)
+| | |
+|---|---|
+| **File** | `components/filter_panel.py` → `render_filter_panel()` ~dòng 355-375 |
+| **Dấu hiệu** | Sau khi merge HSTD kỳ mới có max dư nợ nhỏ hơn kỳ cũ, mở bộ lọc nâng cao → `StreamlitAPIException: value out of range`. |
+| **Nguyên nhân** | Slider vừa truyền `value=safe_value` vừa `key="tc_du_no"`. Sau rerun, `key` thắng `value` nên giữ giá trị cũ (lớn hơn `max_value` mới). |
+| **Fix** | Trước khi render, nếu `st.session_state["tc_du_no"][1] > _max_du_no` thì `del` key đó để slider về `value=safe_value` (đã clamp cả 2 đầu). |
+| **Test** | Compile + import OK |
+| **Ngày fix** | 2026-09-23 |
+
+---
+
+### C40 — Tra cứu mở sai hồ sơ khi Số khế ước trùng hoặc rỗng
+| | |
+|---|---|
+| **File** | `tabs/tab_tracuu_v2.py` → `render()` ~dòng 458-485 |
+| **Dấu hiệu** | Hai hồ sơ cùng Số KU (hoặc Số KU rỗng) → bấm dòng này lại mở hồ sơ của dòng khác. |
+| **Nguyên nhân** | Map hồ sơ bằng `mask = df[COT_SO_KU] == so_ku; df_match.iloc[0]` — lấy theo giá trị Số KU (không unique, có thể rỗng) và trên `df` gốc thay vì `df_f` đã lọc. |
+| **Fix** | Map theo index: `hs_selected = df_f.iloc[pos]` với `pos = rows[0] + start`; button key và trạng thái `tc2_last_sel` dùng `pos` thay vì Số KU. |
+| **Test** | Compile + import OK |
+| **Ngày fix** | 2026-09-23 |
+
+---
+
+### C41 — `_get_options_filtered` TypeError khi cột lẫn số và chuỗi
+| | |
+|---|---|
+| **File** | `components/filter_panel.py` → `_get_options_filtered()` ~dòng 60-69 |
+| **Dấu hiệu** | Mở bộ lọc Xã/Thôn → `TypeError: '<' not supported between instances of 'int' and 'str'`. |
+| **Nguyên nhân** | `sorted(...unique().tolist())` không ép `str()` (khác hàm `_get_unique_values` ở trên), cột Xã/Thôn lẫn số và chuỗi nên sort crash. |
+| **Fix** | Ép `str(v)` và lọc `v != ""` trước khi `sorted`, đồng bộ với `_get_unique_values`. |
+| **Test** | Compile + import OK |
+| **Ngày fix** | 2026-09-23 |
+
+---
+
+### J93 — Cleanup dead code trong filter_panel + fallback NQ11/GQVL load thừa
+| | |
+|---|---|
+| **File** | `components/filter_panel.py` (bỏ `filter_active`, nút "🔍 Tìm"); `tabs/tab_tracuu_v2.py` → `render()` ~dòng 361-371 |
+| **Dấu hiệu** | Biến `filter_active` khai báo 3 chỗ nhưng không widget/mask nào đọc; nút "🔍 Tìm" gán biến rồi bỏ (text_input đã tự rerun); điều kiện fallback NQ11/GQVL `is None` không khớp vì app.py luôn truyền DataFrame rỗng. |
+| **Nguyên nhân** | Dead state / UI thừa / điều kiện fallback sai ngữ nghĩa. |
+| **Fix** | Xóa `filter_active` và nút "🔍 Tìm"; fallback NQ11/GQVL đổi thành "chỉ load 1 lần khi thật sự `None`" (dùng `_load_nq11_gqvl_data()` 1 lần, gán vào biến nào đang None). |
+| **Test** | Compile + import OK |
+| **Ngày fix** | 2026-09-23 |
+
+---
+
 Mỗi khi fix bug, copy template dưới đây và điền vào đúng mục:
 
 ```

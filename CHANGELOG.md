@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## [2026-09-23] — Tra cứu Khách hàng: hiệu năng + tính năng mới (Đợt 2 & 3)
+- `components/filter_panel.py` — vectorize `_pre_compute_search_text` (bỏ `.map(lambda)` → `str.normalize` + `str.translate`); tìm kiếm đa từ khóa AND/OR + auto-detect loại từ khóa + mở rộng cột tìm kiếm (HSSV/vợ chồng/tổ/địa chỉ/tổ trưởng/NĐT); thêm bộ lọc phân loại/hội đoàn thể/điểm GD/đến hạn N ngày/khoanh sắp hết hạn/Số dư TK105=0/có gia hạn; slider dư nợ đổi sang đơn vị triệu đồng.
+- `tabs/tab_tracuu_v2.py` — PDF lazy (chỉ tạo khi tải); spinner; ghi chú CBTD (`db.doc_ghi_chu_kv`/`luu_ghi_chu_kv`) trong dialog + liệt kê khế ước khác cùng KH; audit `tra_cuu_kh` (đã mask PII) + toggle ẩn CMND/SĐT; bảng kết quả dùng `NumberColumn` (sort số) + chọn cột hiển thị; chế độ "Theo khách hàng"; biểu đồ phân bố (plotly); lịch sử tra cứu gần đây.
+
+## [2026-09-23] — Tra cứu Khách hàng: sửa 6 bug nền tảng (Đợt 1)
+- `tabs/tab_tracuu_v2.py` — thêm toggle "Bao gồm hồ sơ đã tất toán" (dùng `df_full` cho role CN) để tra được hồ sơ dư nợ = 0; map hồ sơ theo index `df_f.iloc[pos]` thay vì Số khế ước (tránh mở sai khi KU trùng/rỗng); đổi prefix widget sang `tc2_`; fallback NQ11/GQVL chỉ load 1 lần khi thật sự `None`.
+- `components/filter_panel.py` — thêm `_reset_filter_state()` xóa trực tiếp key `tc_*` trước khi reset (fix nút Reset không hoạt động); sanitize slider `tc_du_no` chống crash `value out of range` sau upload kỳ mới; ép `str()` trước `sorted` trong `_get_options_filtered`; xóa dead code `filter_active` + nút "🔍 Tìm".
+- `BUGMAP.md` — thêm B106/B107/B108/C40/C41/J93.
+
+## [2026-09-23] — Lập kế hoạch nâng cấp tab "Tra cứu Khách hàng" (prompt cho DeepSeek)
+- `.codex/prompts/tracuu_khach_hang_v3.md` — tạo mới: kế hoạch 4 đợt cải tiến `tabs/tab_tracuu_v2.py` + `components/filter_panel.py`; liệt kê 28 vấn đề đã xác minh theo nhóm A (bug chức năng), B (hiệu năng), C (UX/giao diện), D (tính năng nghiệp vụ thiếu), E (nợ kỹ thuật); kèm mockup giao diện, bảng màu theo `docs/UI_GUIDELINES.md`, ràng buộc rule 6, chữ ký hàm và quy tắc bàn giao `CODEX_REVIEW` theo từng đợt. Không sửa code trong lần này.
+
 ## [2026-09-20] — Đồng bộ mã Điểm giao dịch từ file master BCQUERY
 - `config.py` — sinh lại `DGD_MA_MAP` từ `Danh sách điểm giao dịch.XLSX`/sheet `BCQUERY`; sửa các mã/tên lệch trong `DGD_DANH_SACH` như Bửu Hòa, Tân Hiệp 3, Hố Nai 3, Xuân Hưng/Xuân Hòa và Dak Lua.
 - `tests/test_config.py` — thêm regression khóa mapping Hội sở, chặn `DGD_DANH_SACH` thiếu/trùng mã và bảo đảm mọi mã lịch tồn tại trong `DGD_MA_MAP`.

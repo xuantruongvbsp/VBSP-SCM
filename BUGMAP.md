@@ -4907,6 +4907,30 @@ def _to_int(val, default=0):
 
 ---
 
+### E27 — Upload toàn CN compile xanh nhưng runtime lỗi vì helper calamine thiếu
+| | |
+|---|---|
+| **File** | `services/upload_service.py` → `_doc_excel_bytes()`, `tach_file_hstd_toan_cn()`, `tach_file_gqvl_toan_cn()`; `tabs/tab_upload_khnv/_upload_toan_cn.py` → `_doc_excel_nhanh()`, `render_hstd_toan_cn()` |
+| **Dấu hiệu** | `py_compile` pass nhưng preview/tách GQVL gọi `_doc_excel_bytes` hoặc `_doc_excel_nhanh` thì lỗi `NameError`; HSTD vẫn đọc bằng openpyxl và upload vẫn tách lại vì preview không lưu `pgd_map`. |
+| **Nguyên nhân** | Bản tối ưu chỉ đổi call-site nhưng chưa thêm helper thật; preview HSTD truyền `preview.get("pgd_map")` trong khi state không chứa key này, nên luôn rơi về `None`. |
+| **Fix** | Thêm `_doc_excel_bytes()` dùng calamine fallback openpyxl; thêm `_doc_excel_nhanh()` cho UI; chuyển HSTD/GQVL preview sang helper nhanh; lưu `pgd_map` trong preview HSTD để `xu_ly_hstd_toan_cn(..., pgd_map=...)` không tách lại. |
+| **Test** | `tests/test_hstd_toan_cn.py::test_helper_doc_excel_nhanh_ton_tai_va_doc_duoc_bytes`; `test_xu_ly_hstd_dung_pgd_map_co_san_khong_tach_lai`; `test_ui_chi_nhan_xlsx_va_khoa_upload_khi_thieu_don_vi` |
+| **Ngày fix** | 2026-09-20 |
+
+---
+
+### J92 — Mã Điểm giao dịch lệch giữa `DGD_MA_MAP` và `DGD_DANH_SACH`
+| | |
+|---|---|
+| **File** | `config.py` → `DGD_MA_MAP`, `DGD_DANH_SACH`; `tests/test_config.py` |
+| **Dấu hiệu** | `Bửu Hòa` và `Tân Hiệp 3` thiếu `ma_dgd`; `Hố Nai 3` dùng nhầm mã `TXN0462402`; một số Điểm GD khác bị thiếu/sai mã hoặc lệch tên như `Xuân Hòa 2`/`Xuân Hưng`, `Đak Lua`/`Dak Lua`. |
+| **Nguyên nhân** | `DGD_MA_MAP` và `DGD_DANH_SACH` được sinh/bổ sung từ hai nguồn khác nhau; danh sách sau sáp nhập có đổi mã/tên nhưng file cấu hình chưa được đồng bộ từ nguồn master `Danh sách điểm giao dịch.XLSX` sheet `BCQUERY`. |
+| **Fix** | Sinh lại toàn bộ `DGD_MA_MAP` từ `BCQUERY` (271 mã/22 đơn vị), cập nhật `DGD_DANH_SACH` để mọi dòng lịch có `ma_dgd` hợp lệ trong đúng PGD, sửa các dòng lệch tên theo nguồn master. |
+| **Test** | `venv\Scripts\python.exe -m py_compile config.py tests\test_config.py`; `venv\Scripts\python.exe -m pytest tests\test_config.py -q` → 16 passed. |
+| **Ngày fix** | 2026-09-20 |
+
+---
+
 Mỗi khi fix bug, copy template dưới đây và điền vào đúng mục:
 
 ```

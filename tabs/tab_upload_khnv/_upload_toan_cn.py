@@ -22,6 +22,24 @@ _CDTO_SS_FILE_ID = "cdto_cn_file_id"
 _CDTO_SS_RESULT = "cdto_cn_upload_result"
 
 
+def _doc_excel_nhanh(
+    file_bytes: bytes,
+    *,
+    sheet_name: str | int = 0,
+    header: int | None = 0,
+    **kwargs,
+) -> pd.DataFrame:
+    """Đọc nhanh Excel cho preview bằng helper chung của upload_service."""
+    from services.upload_service import _doc_excel_bytes
+
+    return _doc_excel_bytes(
+        file_bytes,
+        sheet_name=sheet_name,
+        header=header,
+        **kwargs,
+    )
+
+
 def _hien_thi_ket_qua_cdto_sau_rerun() -> None:
     """Hiển thị kết quả upload CDTOTKVV đã lưu trước khi reset uploader."""
     ket_qua = st.session_state.get(_CDTO_SS_RESULT)
@@ -352,8 +370,12 @@ def render_hstd_toan_cn(username: str) -> None:
             for ten_pgd in ds_tat_ca:
                 if ten_pgd in pgd_map:
                     try:
-                        df_tmp = pd.read_excel(BytesIO(pgd_map[ten_pgd]), engine="openpyxl", header=4)
-                        so_dong = len(df_tmp)
+                        df_tmp = _doc_excel_nhanh(
+                            pgd_map[ten_pgd],
+                            sheet_name="BCQUERY",
+                            header=4,
+                        )
+                        so_dong = len(df_tmp.dropna(how="all"))
                     except Exception:
                         so_dong = "?"
                 else:
@@ -368,7 +390,7 @@ def render_hstd_toan_cn(username: str) -> None:
 
             st.session_state[_SS_PREVIEW] = {
                 "rows": preview_rows, "thieu": thieu,
-                "so_dv": len(pgd_map),
+                "so_dv": len(pgd_map), "pgd_map": pgd_map,
             }
 
     preview = st.session_state.get(_SS_PREVIEW)
@@ -410,7 +432,7 @@ def render_hstd_toan_cn(username: str) -> None:
     ):
         with st.spinner("⏳ Đang tách và lưu từng PGD..."):
             from services.upload_service import xu_ly_hstd_toan_cn
-            ket_qua = xu_ly_hstd_toan_cn(file_bytes, username=username)
+            ket_qua = xu_ly_hstd_toan_cn(file_bytes, username=username, pgd_map=preview.get("pgd_map"))
 
         if "_loi_doc" in ket_qua:
             st.error(ket_qua["_loi_doc"].thong_bao)
@@ -502,8 +524,7 @@ def render_gqvl_toan_cn(username: str, df_hstd=None) -> None:
             for ten_pgd in ds_tat_ca:
                 if ten_pgd in pgd_map:
                     try:
-                        df_tmp = pd.read_excel(BytesIO(pgd_map[ten_pgd]), engine="openpyxl", header=7)
-                        so_dong_val = len(df_tmp.dropna(how="all"))
+                        so_dong_val = len(_doc_excel_nhanh(pgd_map[ten_pgd], header=7).dropna(how="all"))
                     except Exception:
                         so_dong_val = "?"
                 else:
@@ -556,7 +577,7 @@ def render_gqvl_toan_cn(username: str, df_hstd=None) -> None:
     ):
         with st.spinner("⏳ Đang tách và lưu từng PGD..."):
             from services.upload_service import xu_ly_gqvl_toan_cn
-            ket_qua = xu_ly_gqvl_toan_cn(file_bytes, df_hstd=df_hstd)
+            ket_qua = xu_ly_gqvl_toan_cn(file_bytes, df_hstd=df_hstd, pgd_map=preview.get("pgd_map"))
 
         if "_loi_doc" in ket_qua:
             st.error(ket_qua["_loi_doc"].thong_bao)

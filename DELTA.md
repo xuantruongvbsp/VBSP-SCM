@@ -5,6 +5,17 @@
 
 ---
 
+## [2026-09-23] — Rà soát hoàn chỉnh Tra cứu Khách hàng v3
+
+- Cache của `components/filter_panel.py` có fingerprint nguồn riêng cho CN/PGD, không còn tái sử dụng options/search text giữa hai DataFrame cùng timestamp; search text 200k dòng được ghép rồi normalize một lần.
+- Bộ lọc dư nợ dùng bucket `<10 / 10–30 / 30–50 / 50–100 / >100 triệu` và khoảng tự nhập; thêm lọc hồ sơ đã quá hạn ít nhất N ngày.
+- PII được che nhất quán trong mode Theo khách hàng, Excel hồ sơ và keyword audit nhiều token.
+- Bảng khế ước có cỡ trang `100/200/500`, nút trước/sau, nhảy trang; selection tuyệt đối được phục hồi an toàn khi quay lại trang cũ.
+- Bổ sung mode `Thẻ chi tiết` (tối đa 20 hồ sơ), dialog danh sách khế ước theo khách hàng và chỉ dựng biểu đồ khi expander mở hoặc người dùng tải PDF.
+- Test Tra cứu tăng từ 11 lên 17; Streamlit AppTest đã smoke các mode, mask PII và phân trang.
+
+---
+
 ## [2026-09-23] — Hoàn thiện Tab Tra cứu Khách hàng v3 (đợt cuối)
 
 Hoàn tất các task còn lại của kế hoạch `.codex/prompts/tracuu_khach_hang_v3.md`:
@@ -26,7 +37,7 @@ Hoàn tất các task còn lại của kế hoạch `.codex/prompts/tracuu_khach
 ### Docs
 - `CODE_INDEX.md` / `TEST_COVERAGE.md`: bỏ ref `tab_tracuu.py` (v1 đã xóa), cập nhật v2 + filter_panel.
 
-> **Còn hoãn (không thuộc nghiệm thu, nặng/rủi ro):** chip bộ lọc đang áp (3.2), filter+hiển thị CBTD phụ trách (D6), mode "Thẻ chi tiết" (3.4), highlight dòng QH/khoanh (3.3), debug timing (2.7), hợp nhất `_normalize_search_text` vào `utils.py` (4.2).
+> **Còn hoãn (ngoài phạm vi đợt rà soát này):** chip xóa từng bộ lọc đang áp (3.2), filter+hiển thị CBTD phụ trách (D6), highlight dòng QH/khoanh (3.3), debug timing chi tiết cache hit/miss (2.7), hợp nhất `_normalize_search_text` vào `utils.py` (4.2).
 
 ---
 

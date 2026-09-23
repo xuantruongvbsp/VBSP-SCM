@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 
 import pandas as pd
 
@@ -8,10 +8,24 @@ from components.filter_panel import (
     _keyword_search_mask,
     _normalize_search_text,
     _detect_keyword_type,
+    _data_cache_scope,
+    _due_date_mask,
+    _get_unique_values,
+    _pre_compute_search_text,
+    _resolve_du_no_range,
     _snapshot_filters,
     _restore_filters,
 )
-from tabs.tab_tracuu_v2 import _mask_cmnd, _mask_sdt, _mask_df_pii, _sort_mac_dinh
+from tabs.tab_tracuu_v2 import (
+    _build_theo_khach_hang,
+    _clamp_page,
+    _mask_cmnd,
+    _mask_df_pii,
+    _mask_kw_for_audit,
+    _mask_sdt,
+    _selection_default_for_page,
+    _sort_mac_dinh,
+)
 from config import (
     COT_CMND,
     COT_MA_KH,
@@ -22,6 +36,8 @@ from config import (
     COT_TEN_VC,
     COT_TONG_DU_NO,
     COT_DU_NO_QH,
+    COT_LAI_TON,
+    COT_SO_DU_TG,
 )
 
 
@@ -127,3 +143,71 @@ class TestTracuuSearch:
         assert back["ngay_vay_to"] is None
         assert back["du_no_range"] == (0.0, 500_000_000.0)
         assert back["den_han_trong"] == 30
+
+    def test_cache_scope_khong_dung_lan_du_lieu(self):
+        _get_unique_values.clear()
+        _pre_compute_search_text.clear()
+        df_a = pd.DataFrame({COT_TEN_KH: ["Alpha"], COT_MA_KH: ["A"]})
+        df_b = pd.DataFrame({COT_TEN_KH: ["Beta"], COT_MA_KH: ["B"]})
+        scope_a = _data_cache_scope(df_a, "PGD A", 0.0)
+        scope_b = _data_cache_scope(df_b, "PGD B", 0.0)
+        assert scope_a != scope_b
+        assert _get_unique_values(df_a, COT_TEN_KH, 0.0, scope_a) == ["Alpha"]
+        assert _get_unique_values(df_b, COT_TEN_KH, 0.0, scope_b) == ["Beta"]
+        assert _pre_compute_search_text(
+            df_a, (COT_TEN_KH,), 0.0, scope_a
+        ).tolist() == ["alpha"]
+        assert _pre_compute_search_text(
+            df_b, (COT_TEN_KH,), 0.0, scope_b
+        ).tolist() == ["beta"]
+
+    def test_bucket_du_no_va_tu_nhap(self):
+        assert _resolve_du_no_range("10–30 triệu", 0, 0, 500_000_000) == (
+            10_000_000.0, 30_000_000.0,
+        )
+        assert _resolve_du_no_range("Tự nhập", 80, 20, 500_000_000) == (
+            80_000_000.0, 80_000_000.0,
+        )
+
+    def test_den_han_va_qua_han_n_ngay(self):
+        today = date(2026, 9, 23)
+        values = pd.Series([
+            today - timedelta(days=31),
+            today - timedelta(days=5),
+            today + timedelta(days=7),
+            today + timedelta(days=31),
+        ])
+        assert _due_date_mask(values, qua_han_ngay=30, today=today).tolist() == [
+            True, False, False, False,
+        ]
+        assert _due_date_mask(values, den_han_trong=7, today=today).tolist() == [
+            False, False, True, False,
+        ]
+
+    def test_group_khach_hang_dem_va_cong_tien(self):
+        df = pd.DataFrame({
+            COT_MA_KH: ["KH1", "KH1", "KH2"],
+            COT_TEN_KH: ["A", "A", "B"],
+            COT_TONG_DU_NO: [10, 20, 30],
+            COT_DU_NO_QH: [0, 5, 0],
+            COT_LAI_TON: [1, 2, 3],
+            COT_SO_DU_TG: [4, 5, 6],
+        })
+        out = _build_theo_khach_hang(df).set_index(COT_MA_KH)
+        assert out.loc["KH1", "Số món vay"] == 2
+        assert out.loc["KH1", f"{COT_TONG_DU_NO} (tổng)"] == 30
+        assert out.loc["KH1", f"{COT_DU_NO_QH} (tổng)"] == 5
+
+    def test_selection_phan_trang_va_clamp(self):
+        assert _selection_default_for_page(205, 200, 400) == {
+            "selection": {"rows": [5]}
+        }
+        assert _selection_default_for_page(205, 0, 200) is None
+        assert _clamp_page(9, 3) == 3
+        assert _clamp_page(0, 3) == 1
+
+    def test_audit_mask_pii_trong_tu_khoa_nhieu_token(self):
+        masked = _mask_kw_for_audit("012345678901 nguyen 0901000001")
+        assert "012345678901" not in masked
+        assert "0901000001" not in masked
+        assert "nguyen" in masked

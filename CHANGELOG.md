@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## [2026-09-23] — Hoàn chỉnh Tra cứu Khách hàng v3 sau rà soát
+- `components/filter_panel.py` — thêm fingerprint nguồn vào cache key để không dùng lẫn dữ liệu CN/PGD; tối ưu search text vectorized; thay slider dư nợ bằng bucket + khoảng tự nhập; bổ sung lọc quá hạn N ngày.
+- `tabs/tab_tracuu_v2.py` — bịt các đường lộ PII ở bảng khách hàng/Excel/audit; sửa runtime state của toggle; thêm mode Thẻ chi tiết, dialog khế ước theo khách hàng và biểu đồ lazy.
+- `tabs/tab_tracuu_v2.py` — hoàn thiện phân trang 100/200/500, nút trước/sau, nhảy trang và phục hồi selection bằng index tuyệt đối + `selection_default`.
+- `tests/test_tracuu_search.py` — tăng từ 11 lên 17 test, phủ cache isolation, bucket dư nợ, ngày đến hạn/quá hạn, group khách hàng, selection phân trang và audit PII nhiều token.
+- `BUGMAP.md` — cập nhật B110 và ghi nhận B111–B113 cho cache chéo dữ liệu, PII chưa kín và ghi đè widget state.
+- `DELTA.md` — cập nhật trạng thái hoàn thiện các hạng mục v3 vừa sửa.
+- `TEST_COVERAGE.md` — cập nhật số lượng và phạm vi test Tra cứu Khách hàng.
+
+## [2026-09-23] — Tra cứu Khách hàng: cố định key bảng kết quả
+- `tabs/tab_tracuu_v2.py` — đổi key bảng kết quả chính từ `tc2_table_p{page}` sang `tc2_table` cố định; thêm state `tc2_table_page`/`tc2_selected_idx` để tránh selection cũ mở nhầm dòng khi đổi trang và không sinh rác widget state theo từng trang.
+- `BUGMAP.md` — ghi nhận lỗi B110 về key bảng đổi theo trang làm mất selection state.
+
 ## [2026-09-23] — Tra cứu Khách hàng: hoàn tất task còn lại của kế hoạch v3
 - `tabs/tab_tracuu_v2.py` — thêm preset cột (`_COLUMN_PRESETS`: Cơ bản/Đến hạn/Quá hạn/NQ11-GQVL/Huy động/Khoanh nợ/Tùy chỉnh) + mở rộng `_VIEW_CATALOG`; sắp xếp mặc định Dư nợ QH DESC → Tổng dư nợ DESC (`_sort_mac_dinh`, map dòng theo `df_tab`); mask PII CMND/SĐT khi xuất Excel (`_mask_df_pii`) + sheet `Ghi_chu_bao_mat`, Excel lazy; tách `_build_charts()` trả figs → đính kèm PDF (`figs=`); whitelist ≤12 cột NQ11/GQVL trong `_render_chi_tiet_phu` (chống tràn dialog — C6).
 - `components/filter_panel.py` — bật nút 💾 Lưu bộ lọc (A10, bỏ `disabled=True`): `_render_save_filter` Lưu/Áp/Xóa qua `db.ghi_kv` + `db.ghi_audit("luu_bo_loc_tra_cuu")`; `_snapshot_filters`/`_restore_filters`/`_apply_saved_filters` (date↔isoformat, tuple↔list, xóa key `tc_*` rồi rerun); 2 selectbox đến hạn/khoanh đọc `index` từ dict để khôi phục đúng.

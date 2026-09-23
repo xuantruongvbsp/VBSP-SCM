@@ -9,6 +9,7 @@ Bố cục:
 
 from __future__ import annotations
 
+import hashlib
 import re
 import streamlit as st
 import pandas as pd
@@ -38,9 +39,13 @@ from components.filter_panel import render_filter_panel
 from components.delta_card import kpi_row
 from components.export_pdf import xuat_pdf_co_chart, download_pdf_button
 from data import doc_nq11_toan_cn_pgd, doc_gqvl_toan_cn
+from logger import get_logger
 
 if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
+
+
+logger = get_logger(__name__)
 
 
 # Role được phép ghi ghi chú CBTD (executive/user_pgd chỉ đọc).
@@ -99,6 +104,39 @@ def _mask_pii_col(col: str, v) -> str:
     return str(v)
 
 
+def _record_identity(row: pd.Series) -> str:
+    """Định danh ổn định cho một hồ sơ trong state/UI key."""
+    raw = "\x1f".join(
+        str(row.get(col, "") or "").strip()
+        for col in (COT_MA_KH, COT_SO_KU, COT_TEN_PGD, COT_NGAY_VAY)
+    )
+    raw = f"{row.name}\x1f{raw}"
+    return hashlib.blake2s(raw.encode("utf-8", errors="ignore"), digest_size=8).hexdigest()
+
+
+def _selection_default_for_page(
+    selected_idx: int | None, start: int, end: int
+) -> dict | None:
+    """Đổi index tuyệt đối thành selection mặc định tương đối của trang hiện tại."""
+    if selected_idx is None or not start <= selected_idx < end:
+        return None
+    return {"selection": {"rows": [selected_idx - start]}}
+
+
+def _clamp_page(page: int, total_pages: int) -> int:
+    return max(1, min(int(page), max(1, int(total_pages))))
+
+
+def _change_page(delta: int, total_pages: int) -> None:
+    current = int(st.session_state.get("tc2_page", 1) or 1)
+    st.session_state["tc2_page"] = _clamp_page(current + delta, total_pages)
+
+
+def _ui_scope(*parts) -> str:
+    raw = repr(parts).encode("utf-8", errors="ignore")
+    return hashlib.blake2s(raw, digest_size=10).hexdigest()
+
+
 def _load_nq11_gqvl_data() -> tuple[pd.DataFrame | None, pd.DataFrame | None]:
     """Load NQ11 và GQVL từ cache (fallback khi app.py chưa nạp sẵn)."""
     df_nq11 = None
@@ -106,11 +144,11 @@ def _load_nq11_gqvl_data() -> tuple[pd.DataFrame | None, pd.DataFrame | None]:
     try:
         df_nq11 = doc_nq11_toan_cn_pgd()
     except Exception:
-        pass
+        logger.error("Không đọc được dữ liệu NQ11 cho tab tra cứu", exc_info=True)
     try:
         df_gqvl = doc_gqvl_toan_cn()
     except Exception:
-        pass
+        logger.error("Không đọc được dữ liệu GQVL cho tab tra cứu", exc_info=True)
     return df_nq11, df_gqvl
 
 
@@ -204,7 +242,8 @@ def _detail_dialog(
     so_ku = str(hs.get(COT_SO_KU, "")).strip()
     ma_kh = str(hs.get(COT_MA_KH, "")).strip()
     st.markdown(f"### {hs.get(COT_TEN_KH, '—')}")
-    pdf_state_key = f"tc_pdf_hoso_{so_ku}"
+    _record_key = _record_identity(hs)
+    pdf_state_key = f"tc2_pdf_hoso_{_record_key}"
 
     col1, col2 = st.columns([2, 1])
 
@@ -234,7 +273,7 @@ def _detail_dialog(
         if info_data:
             st.dataframe(
                 pd.DataFrame(info_data, columns=["Thông tin", "Giá trị"]),
-                hide_index=True, use_container_width=True,
+                hide_index=True, width="stretch",
             )
 
     with col2:
@@ -271,7 +310,7 @@ def _detail_dialog(
         if loan_data:
             st.dataframe(
                 pd.DataFrame(loan_data, columns=["Thông tin", "Giá trị"]),
-                hide_index=True, use_container_width=True,
+                hide_index=True, width="stretch",
             )
 
     # NQ11 / GQVL
@@ -297,10 +336,10 @@ def _detail_dialog(
         _ghi_chu_moi = st.text_area(
             "Nội dung ghi chú",
             value=_note.get("ghi_chu", "") if _note else "",
-            key=f"tc_ghi_chu_{so_ku}",
+            key=f"tc2_ghi_chu_{_record_key}",
             height=90,
         )
-        if st.button("💾 Lưu ghi chú", key=f"tc_luu_ghi_chu_{so_ku}"):
+        if st.button("💾 Lưu ghi chú", key=f"tc2_luu_ghi_chu_{_record_key}"):
             if db.luu_ghi_chu_kv(so_ku, _ghi_chu_moi.strip(), username):
                 st.success("Đã lưu ghi chú.")
                 st.rerun()
@@ -316,10 +355,13 @@ def _detail_dialog(
         if not _other.empty:
             st.markdown(f"**🏦 Các khế ước khác của khách hàng này ({len(_other)})**")
             _other_cols = [c for c in [COT_SO_KU, COT_TEN_CT, COT_NGAY_VAY, COT_TONG_DU_NO, COT_TINH_TRANG] if c in _other.columns]
-            st.dataframe(_other[_other_cols], hide_index=True, use_container_width=True)
+            st.dataframe(_other[_other_cols], hide_index=True, width="stretch")
 
     st.divider()
-    excel_data = xuat_excel({f"HS_{so_ku}": hs.to_frame().T})
+    _df_excel_hs = hs.to_frame().T
+    if mask_pii:
+        _df_excel_hs = _mask_df_pii(_df_excel_hs)
+    excel_data = xuat_excel({f"HS_{so_ku or 'khach_hang'}": _df_excel_hs})
     col_xl, col_pdf = st.columns(2)
     with col_xl:
         st.download_button(
@@ -327,11 +369,11 @@ def _detail_dialog(
             data=excel_data,
             file_name=f"ho_so_{so_ku}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True,
-            key=f"tc_dialog_export_{so_ku}",
+            width="stretch",
+            key=f"tc2_dialog_export_{_record_key}",
         )
     with col_pdf:
-        if st.button("📄 Xuất PDF hồ sơ", use_container_width=True, key=f"tc_make_pdf_{so_ku}"):
+        if st.button("📄 Xuất PDF hồ sơ", width="stretch", key=f"tc2_make_pdf_{_record_key}"):
             try:
                 with st.spinner("Đang tạo PDF hồ sơ..."):
                     st.session_state[pdf_state_key] = _tao_pdf_ho_so(hs, info_data, loan_data, username)
@@ -345,7 +387,7 @@ def _detail_dialog(
                 pdf_bytes=pdf_bytes,
                 filename=f"ho_so_{so_ku}.pdf",
                 label="📥 Tải PDF hồ sơ",
-                key=f"tc_dialog_pdf_{so_ku}",
+                key=f"tc2_dialog_pdf_{_record_key}",
             )
 
 
@@ -397,13 +439,13 @@ def _render_kpi_va_xuat(
                 data=_make_excel,
                 file_name="ket_qua_tra_cuu.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True,
-                key="tc_export_excel",
+                width="stretch",
+                key="tc2_export_excel",
             )
         else:
             st.button(
                 f"📊 Excel ({len(df_f):,} — lọc thêm)",
-                disabled=True, use_container_width=True, key="tc_export_excel",
+                disabled=True, width="stretch", key="tc2_export_excel",
             )
 
     with col_pdf:
@@ -416,12 +458,13 @@ def _render_kpi_va_xuat(
 
             def _make_pdf() -> bytes:
                 # Lazy: chỉ tạo PDF khi user bấm tải (tránh tạo PDF mỗi rerun — B3).
-                # Đính kèm biểu đồ phân bố (3.7) nếu có.
+                # Biểu đồ cũng chỉ dựng tại thời điểm tải nếu expander chưa mở.
+                pdf_figs = chart_figs if chart_figs is not None else _build_charts(df_f)
                 return xuat_pdf_co_chart(
                     df=df_f[pdf_cols],
                     tieu_de="KẾT QUẢ TRA CỨU HỒ SƠ",
                     nguoi_xuat=username,
-                    figs=chart_figs,
+                    figs=pdf_figs,
                     cols_tien=cols_tien,
                     them_dong_tong=False,
                 )
@@ -431,12 +474,12 @@ def _render_kpi_va_xuat(
                 data=_make_pdf,
                 file_name="ket_qua_tra_cuu.pdf",
                 mime="application/pdf",
-                use_container_width=True,
-                key="tc_export_pdf",
+                width="stretch",
+                key="tc2_export_pdf",
             )
         else:
             lbl = f"📄 PDF ({len(df_f):,} — lọc thêm)" if len(df_f) > _MAX_EXPORT_PDF else "📄 PDF"
-            st.button(lbl, disabled=True, use_container_width=True, key="tc_export_pdf")
+            st.button(lbl, disabled=True, width="stretch", key="tc2_export_pdf")
 
 
 
@@ -535,14 +578,18 @@ def _build_bang_ket_qua(df_f: pd.DataFrame, visible_cols: set | None = None) -> 
 
 
 def _mask_kw_for_audit(kw: str) -> str:
-    """Che số CMND/SĐT trong từ khóa trước khi ghi audit (tránh lộ PII)."""
+    """Che mọi chuỗi số giống CMND/CCCD/SĐT, kể cả trong từ khóa nhiều token."""
     s = str(kw or "").strip()
-    if re.fullmatch(r"\d{6,}", s):
-        return _mask_cmnd(s)
-    return s
+    def _replace(match: re.Match) -> str:
+        value = match.group(0)
+        if value.startswith("0") and len(value) in (10, 11):
+            return _mask_sdt(value)
+        return _mask_cmnd(value)
+
+    return re.sub(r"(?<!\d)\d{9,12}(?!\d)", _replace, s)
 
 
-def _them_tra_cuu_gan_day(kw: str, n: int) -> None:
+def _them_tra_cuu_gan_day(kw: str, n: int, ten_kh_dau: str = "") -> None:
     """Thêm từ khóa vào lịch sử tra cứu gần đây (chỉ session, không persist)."""
     s = str(kw or "").strip()
     if not s:
@@ -553,7 +600,12 @@ def _them_tra_cuu_gan_day(kw: str, n: int) -> None:
         if item.get("kw") == s:
             del recent[i]
             break
-    recent.appendleft({"kw": s, "n": n})
+    recent.appendleft({
+        "kw": s,
+        "n": n,
+        "ts": datetime.now().strftime("%H:%M %d/%m/%Y"),
+        "ten_kh_dau": str(ten_kh_dau or "").strip(),
+    })
     st.session_state["tc2_recent"] = recent
 
 
@@ -565,8 +617,9 @@ def _render_tra_cuu_gan_day() -> None:
     with st.popover("🕘 Tra cứu gần đây"):
         st.caption("Bấm để tra lại:")
         for item in list(recent):
-            _lbl = f"{item['kw']} · {item['n']} hs"
-            if st.button(_lbl, key=f"tc2_recent_{item['kw']}", use_container_width=True):
+            _first = f" · {item['ten_kh_dau']}" if item.get("ten_kh_dau") else ""
+            _lbl = f"{item['kw']} · {item['n']} hs{_first}"
+            if st.button(_lbl, key=f"tc2_recent_{item['kw']}", width="stretch"):
                 st.session_state.tracuu_filters["search_keyword"] = item["kw"]
                 st.rerun()
 
@@ -620,7 +673,7 @@ def _render_charts(df_f: pd.DataFrame, chart_figs: list | None = None) -> None:
         return
     c1, c2 = st.columns(2)
     for i, (fig, _title) in enumerate(figs):
-        (c1 if i % 2 == 0 else c2).plotly_chart(fig, use_container_width=True)
+        (c1 if i % 2 == 0 else c2).plotly_chart(fig, width="stretch")
 
 
 
@@ -641,6 +694,72 @@ def _build_theo_khach_hang(df_f: pd.DataFrame) -> pd.DataFrame:
         _out = _out.join(_sums)
     _out = _out.join(_cnt)
     return _out.reset_index()
+
+
+@st.dialog("Khế ước của khách hàng", width="large")
+def _customer_loans_dialog(
+    ma_kh: str,
+    loans: pd.DataFrame,
+    mask_pii: bool = False,
+) -> None:
+    """Hiển thị danh sách khế ước con của một khách hàng."""
+    ten_kh = ""
+    if COT_TEN_KH in loans.columns and not loans.empty:
+        ten_kh = str(loans.iloc[0].get(COT_TEN_KH, "") or "").strip()
+    st.markdown(f"### {ten_kh or 'Khách hàng'}")
+    st.caption(f"Mã KH: {ma_kh} · {len(loans):,} khế ước")
+    cols = [
+        c for c in (
+            COT_SO_KU, COT_TEN_CT, COT_NGAY_VAY, COT_NGAY_DH,
+            COT_TONG_DU_NO, COT_DU_NO_QH, COT_TINH_TRANG,
+        ) if c in loans.columns
+    ]
+    shown = _mask_df_pii(loans[cols]) if mask_pii else loans[cols]
+    money_cfg = {
+        c: st.column_config.NumberColumn(format="%,.0f")
+        for c in (COT_TONG_DU_NO, COT_DU_NO_QH) if c in shown.columns
+    }
+    st.dataframe(shown, hide_index=True, column_config=money_cfg or None)
+
+
+def _render_detail_cards(
+    df_f: pd.DataFrame,
+    df_nq11: pd.DataFrame | None,
+    df_gqvl: pd.DataFrame | None,
+    username: str,
+    role: str,
+    df_full: pd.DataFrame | None,
+    mask_pii: bool,
+) -> None:
+    """Render tối đa 20 thẻ hồ sơ bằng component native, không hardcode màu."""
+    limited = _sort_mac_dinh(df_f).head(20)
+    st.caption(f"Hiển thị {len(limited):,}/{len(df_f):,} hồ sơ ưu tiên theo quá hạn và dư nợ.")
+    columns = st.columns(2)
+    for card_no, (_, row) in enumerate(limited.iterrows()):
+        token = _record_identity(row)
+        with columns[card_no % 2]:
+            with st.container(border=True):
+                st.markdown(f"**{row.get(COT_TEN_KH, 'Hồ sơ')}**")
+                cmnd = row.get(COT_CMND, "")
+                sdt = row.get(COT_SDT, "")
+                if mask_pii:
+                    cmnd, sdt = _mask_cmnd(cmnd), _mask_sdt(sdt)
+                st.caption(
+                    f"Mã KH: {row.get(COT_MA_KH, '')} · KU: {row.get(COT_SO_KU, '')}"
+                )
+                c1, c2 = st.columns(2)
+                c1.metric("Tổng dư nợ", fmt_ty(row.get(COT_TONG_DU_NO, 0)))
+                c2.metric("Dư nợ quá hạn", fmt_ty(row.get(COT_DU_NO_QH, 0)))
+                if cmnd or sdt:
+                    st.caption(f"CMND/CCCD: {cmnd or '—'} · SĐT: {sdt or '—'}")
+                if st.button(
+                    "Chi tiết", icon=":material/open_in_new:",
+                    key=f"tc2_card_open_{token}", width="stretch",
+                ):
+                    _detail_dialog(
+                        row, df_nq11, df_gqvl, username, role=role,
+                        df_full=df_full, mask_pii=mask_pii,
+                    )
 
 
 def render(tab: "DeltaGenerator", **kwargs) -> None:
@@ -677,7 +796,6 @@ def render(tab: "DeltaGenerator", **kwargs) -> None:
                 key="tc2_bao_gom_tat_toan",
                 help="Bật: tra cứu trên toàn bộ hồ sơ (kể cả đã tất toán). Tắt: chỉ hồ sơ còn dư nợ.",
             )
-            st.session_state["tc2_bao_gom_tat_toan"] = bao_gom_tat_toan
             df_nguon = df_full if bao_gom_tat_toan else df
 
         # PII: ẩn CMND/SĐT (mặc định bật cho executive — chỉ đọc)
@@ -688,7 +806,6 @@ def render(tab: "DeltaGenerator", **kwargs) -> None:
             key="tc2_mask_pii",
             help="Bật: che CMND/CCCD và SĐT trên bảng kết quả, dialog và file xuất.",
         )
-        st.session_state["tc2_mask_pii"] = mask_pii
 
         if df_nguon is None or df_nguon.empty:
             st.warning("⚠️ Chưa có dữ liệu HSTD để tra cứu.")
@@ -714,9 +831,16 @@ def render(tab: "DeltaGenerator", **kwargs) -> None:
         if _search_kw:
             _kw_masked = _mask_kw_for_audit(_search_kw)
             if _kw_masked and _kw_masked != st.session_state.get("tc2_last_audited"):
-                db.ghi_audit(username, "tra_cuu_kh", f"kw={_kw_masked}; n={len(df_f)}")
+                db.ghi_audit(
+                    username,
+                    "tra_cuu_kh",
+                    f"kw={_kw_masked}; n={len(df_f)}; pgd={pgd_user or 'toan_cn'}",
+                )
                 st.session_state["tc2_last_audited"] = _kw_masked
-            _them_tra_cuu_gan_day(_search_kw, len(df_f))
+            _ten_kh_dau = ""
+            if not df_f.empty and COT_TEN_KH in df_f.columns:
+                _ten_kh_dau = str(df_f.iloc[0].get(COT_TEN_KH, "") or "").strip()
+            _them_tra_cuu_gan_day(_search_kw, len(df_f), _ten_kh_dau)
 
         # ── Số liệu tổng hợp ──────────────────────────────────────────────
         tong_no = float(pd.to_numeric(df_f.get(COT_TONG_DU_NO, 0), errors="coerce").fillna(0).sum()) \
@@ -727,11 +851,9 @@ def render(tab: "DeltaGenerator", **kwargs) -> None:
         gqvl_count = int(df_f["__is_gqvl"].fillna(False).sum()) if "__is_gqvl" in df_f.columns else 0
 
         st.divider()
-        # Dựng biểu đồ 1 lần — dùng cho cả expander lẫn đính kèm PDF (3.7).
-        chart_figs = _build_charts(df_f)
         _render_kpi_va_xuat(
             df_f, nq11_count, gqvl_count, qh_count, tong_no, username,
-            mask_pii=mask_pii, chart_figs=chart_figs,
+            mask_pii=mask_pii, chart_figs=None,
         )
 
         # ── Bảng kết quả ────────────────────────────────────────────────
@@ -740,15 +862,23 @@ def render(tab: "DeltaGenerator", **kwargs) -> None:
             st.info("Không có hồ sơ phù hợp. Thử nới bộ lọc hoặc đổi từ khóa tìm kiếm.")
             return
 
-        _mode = st.radio(
+        _mode = st.segmented_control(
             "Chế độ xem",
-            options=["Theo khế ước", "Theo khách hàng"],
-            horizontal=True,
+            options=["Theo khế ước", "Theo khách hàng", "Thẻ chi tiết"],
+            default="Theo khế ước",
+            required=True,
             key="tc2_mode",
         )
 
-        with st.expander("📊 Phân bố kết quả", expanded=False):
-            _render_charts(df_f, chart_figs)
+        chart_expander = st.expander(
+            "📊 Phân bố kết quả",
+            expanded=False,
+            key="tc2_chart_expander",
+            on_change="rerun",
+        )
+        if chart_expander.open:
+            with chart_expander:
+                _render_charts(df_f, _build_charts(df_f))
 
 
         # ── Chế độ "Theo khách hàng" ────────────────────────────────────
@@ -758,17 +888,32 @@ def render(tab: "DeltaGenerator", **kwargs) -> None:
                 st.info("Không gom được theo khách hàng (thiếu cột Mã KH).")
                 return
             st.caption(f"💡 {len(_df_kh):,} khách hàng — bấm chọn để xem danh sách khế ước.")
+            _kh_scope = _ui_scope(
+                ts_hstd, pgd_user, len(df_f), st.session_state.get("tracuu_filters", {})
+            )
+            if st.session_state.get("tc2_customer_table_scope") != _kh_scope:
+                st.session_state["tc2_customer_table_scope"] = _kh_scope
+                st.session_state.pop("tc2_table_kh", None)
+                st.session_state["tc2_last_customer_sel"] = None
+            _df_kh_show = _mask_df_pii(_df_kh) if mask_pii else _df_kh
             _ev = st.dataframe(
-                _df_kh, hide_index=True, use_container_width=True, height=460,
+                _df_kh_show, hide_index=True, width="stretch", height=460,
                 key="tc2_table_kh", on_select="rerun", selection_mode="single-row",
             )
             _rows = _ev.selection.get("rows", []) if _ev and getattr(_ev, "selection", None) else []
             if _rows:
                 _ma_kh_sel = str(_df_kh.iloc[_rows[0]][COT_MA_KH]).strip()
                 _ds_ku = df_f[df_f[COT_MA_KH].astype(str).str.strip() == _ma_kh_sel]
-                st.markdown(f"**Khế ước của KH `{_ma_kh_sel}` ({len(_ds_ku)})**")
-                _ku_cols = [c for c in [COT_SO_KU, COT_TEN_CT, COT_NGAY_VAY, COT_TONG_DU_NO, COT_DU_NO_QH, COT_TINH_TRANG] if c in _ds_ku.columns]
-                st.dataframe(_ds_ku[_ku_cols], hide_index=True, use_container_width=True)
+                _customer_token = _ui_scope(_kh_scope, _ma_kh_sel)
+                if _customer_token != st.session_state.get("tc2_last_customer_sel"):
+                    st.session_state["tc2_last_customer_sel"] = _customer_token
+                    _customer_loans_dialog(_ma_kh_sel, _ds_ku, mask_pii=mask_pii)
+            return
+
+        if _mode == "Thẻ chi tiết":
+            _render_detail_cards(
+                df_f, df_nq11, df_gqvl, username, role, df_full, mask_pii
+            )
             return
 
         # ── Chế độ "Theo khế ước": preset cột + sắp xếp mặc định ──────────
@@ -801,36 +946,88 @@ def render(tab: "DeltaGenerator", **kwargs) -> None:
             st.info("Không có cột nào để hiển thị. Chọn ít nhất 1 cột.")
             return
 
-        # ── Phân trang (giữ nguyên selection mode) ──
-        PAGE_SIZE = 200
+        # ── Phân trang + selection tuyệt đối ──
+        table_scope = _ui_scope(
+            ts_hstd,
+            pgd_user,
+            len(df_tab),
+            _preset,
+            sorted(_visible),
+            st.session_state.get("tracuu_filters", {}),
+        )
+        if st.session_state.get("tc2_table_scope") != table_scope:
+            st.session_state["tc2_table_scope"] = table_scope
+            st.session_state["tc2_page"] = 1
+            st.session_state["tc2_selected_idx"] = None
+            st.session_state["tc2_last_sel"] = None
+            st.session_state.pop("tc2_table", None)
+
+        st.session_state.setdefault("tc2_page_size", 200)
+        page_size = int(st.selectbox(
+            "Số dòng mỗi trang",
+            options=[100, 200, 500],
+            key="tc2_page_size",
+            width=180,
+        ))
         total_rows = len(df_view)
-        total_pages = max(1, (total_rows + PAGE_SIZE - 1) // PAGE_SIZE)
+        total_pages = max(1, (total_rows + page_size - 1) // page_size)
+        current_page = _clamp_page(st.session_state.get("tc2_page", 1), total_pages)
+        if st.session_state.get("tc2_page") != current_page:
+            st.session_state["tc2_page"] = current_page
+
         if total_pages > 1:
-            c_pg, c_info = st.columns([1, 3])
+            c_prev, c_pg, c_next, c_info = st.columns([1, 2, 1, 5])
+            with c_prev:
+                st.button(
+                    "‹", key="tc2_page_prev", help="Trang trước",
+                    disabled=current_page <= 1, width="stretch",
+                    on_click=_change_page, args=(-1, total_pages),
+                )
             with c_pg:
-                page = st.number_input(
-                    "Trang",
-                    min_value=1, max_value=total_pages, value=1,
-                    key="tc2_page",
+                page = int(st.number_input(
+                    "Trang", min_value=1, max_value=total_pages,
+                    step=1, key="tc2_page",
+                ))
+            with c_next:
+                st.button(
+                    "›", key="tc2_page_next", help="Trang sau",
+                    disabled=current_page >= total_pages, width="stretch",
+                    on_click=_change_page, args=(1, total_pages),
                 )
             with c_info:
-                st.caption(f"Hiển thị {(page-1)*PAGE_SIZE+1:,}–{min(page*PAGE_SIZE, total_rows):,} / {total_rows:,} dòng")
+                st.caption(
+                    f"Hiển thị {(page-1)*page_size+1:,}–"
+                    f"{min(page*page_size, total_rows):,} / {total_rows:,} dòng"
+                )
         else:
             page = 1
+            st.session_state["tc2_page"] = 1
 
-        start = (page - 1) * PAGE_SIZE
-        end = min(start + PAGE_SIZE, total_rows)
+        start = (page - 1) * page_size
+        end = min(start + page_size, total_rows)
         chunk = df_view.iloc[start:end]
+        page_changed = (
+            st.session_state.get("tc2_table_page") != page
+            or st.session_state.get("tc2_table_page_size") != page_size
+        )
+        if page_changed:
+            st.session_state["tc2_table_page"] = page
+            st.session_state["tc2_table_page_size"] = page_size
+            st.session_state.pop("tc2_table", None)
+
+        selected_idx = st.session_state.get("tc2_selected_idx")
+        selection_default = _selection_default_for_page(selected_idx, start, end)
 
         _col_cfg = {m: st.column_config.NumberColumn(format="%,.0f") for m in money_labels}
         event = st.dataframe(
             chunk,
             hide_index=True,
-            use_container_width=True,
+            width="stretch",
             height=460,
-            key=f"tc2_table_p{page}",
+            key="tc2_table",
             on_select="rerun",
             selection_mode="single-row",
+            selection_default=selection_default,
             column_config=(_col_cfg if _col_cfg else None),
         )
 
@@ -852,16 +1049,18 @@ def render(tab: "DeltaGenerator", **kwargs) -> None:
                         f"Đã chọn: **{ten_selected or 'Hồ sơ'}**"
                         f"{f' · Số KU: `{so_ku}`' if so_ku else ''}"
                     )
+                st.session_state["tc2_selected_idx"] = pos
                 should_auto_open = pos != st.session_state.get("tc2_last_sel")
                 should_open_again = col_open.button(
                     "📋 Chi tiết",
                     key=f"tc2_open_selected_{pos}",
-                    use_container_width=True,
+                    width="stretch",
                 )
                 if should_auto_open or should_open_again:
                     st.session_state["tc2_last_sel"] = pos
                     _detail_dialog(hs_selected, df_nq11, df_gqvl, username, role=role, df_full=df_full, mask_pii=mask_pii)
-        else:
+        elif not page_changed:
+            st.session_state["tc2_selected_idx"] = None
             st.session_state["tc2_last_sel"] = None
 
 

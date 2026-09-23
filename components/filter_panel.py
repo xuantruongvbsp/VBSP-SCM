@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import re
 import unicodedata
 
@@ -33,11 +34,57 @@ _SEARCH_COLS = (
     COT_TEN_TO_TRUONG, COT_MA_NHA_DAU_TU,
 )
 
+_DU_NO_BUCKETS = (
+    "Tất cả",
+    "< 10 triệu",
+    "10–30 triệu",
+    "30–50 triệu",
+    "50–100 triệu",
+    "> 100 triệu",
+    "Tự nhập",
+)
+_FILTER_WIDGET_PREFIX = "tc2_f_"
+
+
+def _clear_filter_widget_state() -> None:
+    """Xóa state widget filter hiện tại và key `tc_*` cũ còn sót sau nâng cấp."""
+    for key in list(st.session_state):
+        if key.startswith(_FILTER_WIDGET_PREFIX) or (
+            key.startswith("tc_") and not key.startswith("tc2_")
+        ):
+            del st.session_state[key]
+
+
+def _data_cache_scope(df: pd.DataFrame, pgd_user: str | None, ts_hstd: float) -> str:
+    """Fingerprint nguồn dữ liệu để cache không dùng lẫn giữa các phiên/PGD."""
+    attr_key = f"_tracuu_scope_{pgd_slug(pgd_user) if pgd_user else 'cn'}_{ts_hstd}"
+    cached = df.attrs.get(attr_key)
+    if cached:
+        return str(cached)
+
+    identity_cols = [
+        c for c in (COT_MA_KH, COT_SO_KU, COT_TONG_DU_NO, COT_NGAY_DH)
+        if c in df.columns
+    ]
+    try:
+        hashed = pd.util.hash_pandas_object(df[identity_cols], index=True).values.tobytes()
+        digest = hashlib.blake2b(hashed, digest_size=12).hexdigest()
+    except (TypeError, ValueError):
+        digest = f"obj-{id(df)}"
+    scope = (
+        f"{pgd_slug(pgd_user) if pgd_user else 'cn'}:"
+        f"{float(ts_hstd):.6f}:{len(df)}:{len(df.columns)}:{digest}"
+    )
+    df.attrs[attr_key] = scope
+    return scope
+
 
 @st.cache_data(show_spinner=False)
-def _get_unique_values(_df: pd.DataFrame, col: str, ts: float = 0.0) -> list:
+def _get_unique_values(
+    _df: pd.DataFrame, col: str, ts: float = 0.0, cache_scope: str = ""
+) -> list:
     """Get sorted unique values from column, handling missing values."""
-    _ = ts
+    _ = (ts, cache_scope)
     if col not in _df.columns:
         return []
     values = _df[col].dropna().unique().tolist()
@@ -45,9 +92,11 @@ def _get_unique_values(_df: pd.DataFrame, col: str, ts: float = 0.0) -> list:
 
 
 @st.cache_data(show_spinner=False)
-def _pre_compute_max_du_no(_df: pd.DataFrame, col: str, ts: float = 0.0) -> float:
+def _pre_compute_max_du_no(
+    _df: pd.DataFrame, col: str, ts: float = 0.0, cache_scope: str = ""
+) -> float:
     """Cache max dư nợ — tránh full column scan mỗi rerun."""
-    _ = ts
+    _ = (ts, cache_scope)
     if col not in _df.columns:
         return 1_000_000_000.0
     try:
@@ -59,10 +108,15 @@ def _pre_compute_max_du_no(_df: pd.DataFrame, col: str, ts: float = 0.0) -> floa
 
 
 @st.cache_data(show_spinner=False)
-def _pre_convert_dates(_df: pd.DataFrame, cols: tuple[str, ...], ts: float = 0.0) -> dict[str, "pd.Series"]:
-    """Cache pre-converted datetime series — tránh pd.to_datetime() mỗi rerun."""
-    _ = ts
-    result: dict[str, pd.Series] = {}
+def _pre_convert_dates(
+    _df: pd.DataFrame,
+    cols: tuple[str, ...],
+    ts: float = 0.0,
+    cache_scope: str = "",
+) -> pd.DataFrame:
+    """Cache DataFrame ngày đã chuyển kiểu, giữ index nguồn và không chia sẻ Series mutable."""
+    _ = (ts, cache_scope)
+    result = pd.DataFrame(index=_df.index)
     for col in cols:
         if col in _df.columns:
             result[col] = pd.to_datetime(_df[col], errors="coerce")
@@ -71,36 +125,44 @@ def _pre_convert_dates(_df: pd.DataFrame, cols: tuple[str, ...], ts: float = 0.0
 
 @st.cache_data(show_spinner=False)
 def _get_options_filtered(
-    _df: pd.DataFrame, filter_col: str, filter_vals: tuple, target_col: str, ts: float = 0.0
+    _df: pd.DataFrame,
+    filter_col: str,
+    filter_vals: tuple,
+    target_col: str,
+    ts: float = 0.0,
+    cache_scope: str = "",
 ) -> list:
     """Unique target_col values filtered by filter_col — cached by (filter_vals, ts)."""
-    _ = ts
+    _ = (ts, cache_scope)
     if not filter_vals or filter_col not in _df.columns or target_col not in _df.columns:
-        return _get_unique_values(_df, target_col, ts)
+        return _get_unique_values(_df, target_col, ts, cache_scope)
     mask = _df[filter_col].isin(filter_vals)
     return sorted([str(v) for v in _df.loc[mask, target_col].dropna().unique().tolist() if v != ""])
 
 
 @st.cache_data(show_spinner=False)
-def _pre_compute_search_text(_df: pd.DataFrame, search_cols: tuple[str, ...], ts: float = 0.0) -> "pd.Series":
+def _pre_compute_search_text(
+    _df: pd.DataFrame,
+    search_cols: tuple[str, ...],
+    ts: float = 0.0,
+    cache_scope: str = "",
+) -> "pd.Series":
     """Cache chuỗi tìm kiếm đã chuẩn hóa — ghép các cột, normalize 1 lần duy nhất.
 
     Vectorize bằng `str.normalize("NFD")` + `str.translate` thay vì `.map(lambda ...)`
     để tránh ~2 triệu lời gọi Python khi lọc 200k dòng × 5 cột.
     """
-    _ = ts
+    _ = (ts, cache_scope)
     # Bảng xóa ký tự kết hợp (dấu tiếng Việt) U+0300–U+036F sau khi NFD.
     _combining = {i: None for i in range(0x0300, 0x0370)}
-    parts: list[pd.Series] = []
-    for col in search_cols:
-        if col in _df.columns:
-            s = _df[col].fillna("").astype(str)
-            s = s.str.lower().str.replace("đ", "d", regex=False)
-            s = s.str.normalize("NFD").str.translate(_combining)
-            s = s.str.replace(r"\s+", " ", regex=True).str.strip()
-            parts.append(s)
+    parts = [_df[col].fillna("").astype(str) for col in search_cols if col in _df.columns]
     if parts:
-        return pd.concat(parts, axis=0).groupby(level=0).agg(" | ".join)
+        combined = parts[0]
+        for part in parts[1:]:
+            combined = combined.str.cat(part, sep=" | ")
+        combined = combined.str.lower().str.replace("đ", "d", regex=False)
+        combined = combined.str.normalize("NFD").str.translate(_combining)
+        return combined.str.replace(r"\s+", " ", regex=True).str.strip()
     return pd.Series("", index=_df.index)
 
 
@@ -143,6 +205,47 @@ def _detect_keyword_type(kw: str) -> str:
     if s.upper().startswith("KU") or "." in s:
         return "Số khế ước"
     return "Tên khách hàng"
+
+
+def _resolve_du_no_range(
+    bucket: str,
+    min_trieu: float,
+    max_trieu: float,
+    source_max_vnd: float,
+) -> tuple[float, float]:
+    """Đổi bucket/tự nhập triệu đồng thành khoảng VND dùng để lọc."""
+    source_max_trieu = max(0.0, float(source_max_vnd) / 1_000_000.0)
+    ranges = {
+        "Tất cả": (0.0, source_max_trieu),
+        "< 10 triệu": (0.0, 10.0),
+        "10–30 triệu": (10.0, 30.0),
+        "30–50 triệu": (30.0, 50.0),
+        "50–100 triệu": (50.0, 100.0),
+        "> 100 triệu": (100.0, source_max_trieu),
+    }
+    if bucket == "Tự nhập":
+        low = max(0.0, float(min_trieu or 0.0))
+        high = max(low, float(max_trieu if max_trieu is not None else source_max_trieu))
+    else:
+        low, high = ranges.get(bucket, ranges["Tất cả"])
+    return low * 1_000_000.0, max(low, high) * 1_000_000.0
+
+
+def _due_date_mask(
+    values: pd.Series,
+    den_han_trong: int | None = None,
+    qua_han_ngay: int = 0,
+    today: date | None = None,
+) -> pd.Series:
+    """Mask ngày đến hạn cho hai chế độ sắp đến hạn và đã quá hạn N ngày."""
+    dates = pd.to_datetime(values, errors="coerce")
+    current = pd.Timestamp(today or date.today())
+    mask = pd.Series(True, index=values.index)
+    if den_han_trong:
+        mask &= (dates >= current) & (dates <= current + pd.Timedelta(days=int(den_han_trong)))
+    if qua_han_ngay:
+        mask &= dates <= current - pd.Timedelta(days=int(qua_han_ngay))
+    return mask.fillna(False)
 
 
 def _keyword_search_mask(
@@ -216,9 +319,7 @@ def _reset_filter_state(pgd_user: str | None, _max_du_no: float) -> None:
     Streamlit ưu tiên session_state[key] của widget hơn `value=`/`default=`,
     nên nếu chỉ gán lại dict mà không xóa key `tc_*` thì widget vẫn giữ giá trị cũ.
     """
-    for k in list(st.session_state):
-        if k.startswith("tc_") and not k.startswith("tc2_"):
-            del st.session_state[k]
+    _clear_filter_widget_state()
     st.session_state.tracuu_filters = {
         "search_keyword": "",
         "search_mode": "AND",
@@ -230,12 +331,16 @@ def _reset_filter_state(pgd_user: str | None, _max_du_no: float) -> None:
         "filter_phan_loai": [],
         "filter_dvut": [],
         "filter_dgd": [],
+        "du_no_bucket": "Tất cả",
+        "du_no_min_trieu": 0.0,
+        "du_no_max_trieu": float(_max_du_no) / 1_000_000.0,
         "du_no_range": (0.0, _max_du_no),
         "ngay_vay_from": None,
         "ngay_vay_to": None,
         "ngay_dh_from": None,
         "ngay_dh_to": None,
         "den_han_trong": None,
+        "qua_han_ngay": 0,
         "khoanh_sap_hh": None,
         "so_du_tg_0": False,
         "co_gia_han": False,
@@ -292,9 +397,7 @@ def _apply_saved_filters(snap: dict, pgd_user: str | None) -> None:
     if pgd_user:
         base["selected_pgd"] = [pgd_user]
     st.session_state.tracuu_filters = base
-    for k in list(st.session_state):
-        if k.startswith("tc_") and not k.startswith("tc2_"):
-            del st.session_state[k]
+    _clear_filter_widget_state()
     st.rerun()
 
 
@@ -304,8 +407,8 @@ def _render_save_filter(pgd_user: str | None) -> None:
     key = f"tracuu_filter_{pgd_slug(pgd_user) if pgd_user else 'cn'}_{username}"
     saved = db.doc_kv(key) or {}
     snap = saved.get("filters") or {}
-    with st.popover("💾 Bộ lọc đã lưu", use_container_width=True):
-        if st.button("💾 Lưu bộ lọc hiện tại", key="tc_save_now", use_container_width=True):
+    with st.popover("💾 Bộ lọc đã lưu", width="stretch"):
+        if st.button("💾 Lưu bộ lọc hiện tại", key="tc2_f_save_now", width="stretch"):
             _snap = _snapshot_filters(st.session_state.get("tracuu_filters", {}))
             db.ghi_kv(key, {"filters": _snap}, username)
             db.ghi_audit(username, "luu_bo_loc_tra_cuu", f"n_filter={sum(1 for v in _snap.values() if v)}")
@@ -313,9 +416,9 @@ def _render_save_filter(pgd_user: str | None) -> None:
             st.rerun()
         if snap:
             st.caption("Đã có bộ lọc lưu:")
-            if st.button("↩️ Áp dụng", key="tc_apply_saved", use_container_width=True):
+            if st.button("↩️ Áp dụng", key="tc2_f_apply_saved", width="stretch"):
                 _apply_saved_filters(snap, pgd_user)
-            if st.button("🗑 Xóa", key="tc_del_saved", use_container_width=True):
+            if st.button("🗑 Xóa", key="tc2_f_del_saved", width="stretch"):
                 db.ghi_kv(key, {"filters": {}}, username)
                 db.ghi_audit(username, "xoa_bo_loc_tra_cuu", f"key={key}")
                 st.success("Đã xóa bộ lọc đã lưu.")
@@ -346,9 +449,13 @@ def render_filter_panel(
         Filtered DataFrame
     """
     
-    # Pre-compute cached values
-    _max_du_no = _pre_compute_max_du_no(df, COT_TONG_DU_NO, ts_hstd)
-    _date_series = _pre_convert_dates(df, (COT_NGAY_VAY, COT_NGAY_DH), ts_hstd)
+    # Mọi cache dùng fingerprint nguồn thay vì chỉ timestamp; tránh dùng lẫn dữ liệu
+    # giữa CN/PGD hoặc giữa tập đang hoạt động và tập gồm hồ sơ tất toán.
+    _cache_scope = _data_cache_scope(df, pgd_user, ts_hstd)
+    _max_du_no = _pre_compute_max_du_no(df, COT_TONG_DU_NO, ts_hstd, _cache_scope)
+    _date_series = _pre_convert_dates(
+        df, (COT_NGAY_VAY, COT_NGAY_DH), ts_hstd, _cache_scope
+    )
 
     # Initialize filter state
     if "tracuu_filters" not in st.session_state:
@@ -363,12 +470,16 @@ def render_filter_panel(
             "filter_phan_loai": [],
             "filter_dvut": [],
             "filter_dgd": [],
+            "du_no_bucket": "Tất cả",
+            "du_no_min_trieu": 0.0,
+            "du_no_max_trieu": float(_max_du_no) / 1_000_000.0,
             "du_no_range": (0.0, _max_du_no),
             "ngay_vay_from": None,
             "ngay_vay_to": None,
             "ngay_dh_from": None,
             "ngay_dh_to": None,
             "den_han_trong": None,
+            "qua_han_ngay": 0,
             "khoanh_sap_hh": None,
             "so_du_tg_0": False,
             "co_gia_han": False,
@@ -385,7 +496,7 @@ def render_filter_panel(
             "🔍 Tìm kiếm nhanh",
             value=st.session_state.tracuu_filters["search_keyword"],
             placeholder="Tên KH, CMND/CCCD, Số khế ước, SĐT, HSSV, vợ/chồng, tổ, địa chỉ...",
-            key="tc_search_kw",
+            key="tc2_f_search_kw",
         )
         _kw_type = _detect_keyword_type(search_kw)
         if _kw_type and search_kw.strip():
@@ -395,7 +506,7 @@ def render_filter_panel(
             "Ghép từ khóa",
             options=["AND", "OR"],
             index=0 if st.session_state.tracuu_filters.get("search_mode", "AND") == "AND" else 1,
-            key="tc_search_mode",
+            key="tc2_f_search_mode",
             help="AND: mọi từ phải khớp. OR: khớp 1 trong các từ.",
         )
     with col3:
@@ -411,11 +522,13 @@ def render_filter_panel(
             or st.session_state.tracuu_filters.get("filter_phan_loai")
             or st.session_state.tracuu_filters.get("filter_dvut")
             or st.session_state.tracuu_filters.get("filter_dgd")
+            or st.session_state.tracuu_filters.get("du_no_bucket", "Tất cả") != "Tất cả"
             or st.session_state.tracuu_filters.get("ngay_vay_from")
             or st.session_state.tracuu_filters.get("ngay_vay_to")
             or st.session_state.tracuu_filters.get("ngay_dh_from")
             or st.session_state.tracuu_filters.get("ngay_dh_to")
             or st.session_state.tracuu_filters.get("den_han_trong")
+            or st.session_state.tracuu_filters.get("qua_han_ngay")
             or st.session_state.tracuu_filters.get("khoanh_sap_hh")
             or st.session_state.tracuu_filters.get("so_du_tg_0")
             or st.session_state.tracuu_filters.get("co_gia_han")
@@ -426,8 +539,8 @@ def render_filter_panel(
         )
         if st.button(
             "🔄 Reset",
-            use_container_width=True,
-            key="tc_reset_top",
+            width="stretch",
+            key="tc2_f_reset_top",
             disabled=not _has_any_filter,
         ):
             _reset_filter_state(pgd_user, _max_du_no)
@@ -440,7 +553,7 @@ def render_filter_panel(
         col_pgd, col_xa, col_thon = st.columns(3)
         
         with col_pgd:
-            ds_pgd = _get_unique_values(df, COT_TEN_PGD, ts_hstd)
+            ds_pgd = _get_unique_values(df, COT_TEN_PGD, ts_hstd, _cache_scope)
             if pgd_user:
                 # User PGD chỉ thấy PGD của mình
                 selected_pgd = [pgd_user]
@@ -449,7 +562,7 @@ def render_filter_panel(
                     options=ds_pgd,
                     default=selected_pgd,
                     disabled=True,
-                    key="tc_pgd_disabled",
+                    key="tc2_f_pgd_disabled",
                 )
             else:
                 selected_pgd = st.multiselect(
@@ -457,27 +570,31 @@ def render_filter_panel(
                     options=ds_pgd,
                     default=st.session_state.tracuu_filters["selected_pgd"],
                     placeholder="Tất cả PGD",
-                    key="tc_pgd",
+                    key="tc2_f_pgd",
                 )
         
         with col_xa:
-            ds_xa = _get_options_filtered(df, COT_TEN_PGD, tuple(selected_pgd), COT_TEN_XA, ts_hstd)
+            ds_xa = _get_options_filtered(
+                df, COT_TEN_PGD, tuple(selected_pgd), COT_TEN_XA, ts_hstd, _cache_scope
+            )
             selected_xa = st.multiselect(
                 "Xã/Phường",
                 options=ds_xa,
                 default=[x for x in st.session_state.tracuu_filters["selected_xa"] if x in ds_xa],
                 placeholder="Tất cả xã",
-                key="tc_xa",
+                key="tc2_f_xa",
             )
         
         with col_thon:
-            ds_thon = _get_options_filtered(df, COT_TEN_XA, tuple(selected_xa), COT_TEN_THON, ts_hstd)
+            ds_thon = _get_options_filtered(
+                df, COT_TEN_XA, tuple(selected_xa), COT_TEN_THON, ts_hstd, _cache_scope
+            )
             selected_thon = st.multiselect(
                 "Thôn/Tổ dân phố",
                 options=ds_thon,
                 default=[x for x in st.session_state.tracuu_filters["selected_thon"] if x in ds_thon],
                 placeholder="Tất cả thôn",
-                key="tc_thon",
+                key="tc2_f_thon",
             )
         
         st.divider()
@@ -487,17 +604,17 @@ def render_filter_panel(
         col_ct, col_nv = st.columns(2)
         
         with col_ct:
-            ds_ct = _get_unique_values(df, COT_TEN_CT, ts_hstd)
+            ds_ct = _get_unique_values(df, COT_TEN_CT, ts_hstd, _cache_scope)
             selected_ct = st.multiselect(
                 "Chương trình tín dụng",
                 options=ds_ct,
                 default=st.session_state.tracuu_filters["selected_ct"],
                 placeholder="Tất cả chương trình",
-                key="tc_ct",
+                key="tc2_f_ct",
             )
         
         with col_nv:
-            ds_nv = _get_unique_values(df, COT_NGUON_VON, ts_hstd)
+            ds_nv = _get_unique_values(df, COT_NGUON_VON, ts_hstd, _cache_scope)
             ds_nv_norm = sorted({v for v in (_normalize_nguon_von_code(x) for x in ds_nv) if v != ""})
             nv_options = []
             for nv in ds_nv_norm:
@@ -512,7 +629,7 @@ def render_filter_panel(
                     if any(opt[0] == nv for opt in nv_options)
                 ],
                 placeholder="Tất cả nguồn vốn",
-                key="tc_nv",
+                key="tc2_f_nv",
             )
             # Map back to values
             selected_nv = [opt[0] for opt in nv_options if opt[1] in selected_nv_labels]
@@ -522,37 +639,46 @@ def render_filter_panel(
         # Row 3: Dư nợ & Ngày
         st.markdown("**💰 Dư nợ & Ngày tháng**")
         
-        # Dư nợ range (hiển thị triệu đồng — tránh slider VND vô dụng với dư nợ nghìn tỷ)
+        # Bucket dư nợ + khoảng tự nhập (triệu đồng).
         if COT_TONG_DU_NO in df.columns:
             _max_du_no_trieu = _max_du_no / 1_000_000.0
-            # A3: nếu session_state cũ giữ slider vượt max mới (sau khi upload kỳ mới
-            # có max dư nợ nhỏ hơn) → xóa để slider về `value=safe_value`, tránh crash.
-            _stored_range = st.session_state.get("tc_du_no")
-            if _stored_range is not None:
-                try:
-                    if float(_stored_range[1]) > float(_max_du_no_trieu):
-                        del st.session_state["tc_du_no"]
-                except (TypeError, ValueError, IndexError):
-                    del st.session_state["tc_du_no"]
-            raw_range = st.session_state.tracuu_filters["du_no_range"]  # VND
-            safe_value_trieu = (
-                max(0.0, float(raw_range[0]) / 1_000_000.0),
-                min(float(raw_range[1]) / 1_000_000.0, _max_du_no_trieu),
+            _bucket_current = st.session_state.tracuu_filters.get("du_no_bucket", "Tất cả")
+            du_no_bucket = st.selectbox(
+                "Khoảng dư nợ",
+                options=_DU_NO_BUCKETS,
+                index=_DU_NO_BUCKETS.index(_bucket_current)
+                if _bucket_current in _DU_NO_BUCKETS else 0,
+                key="tc2_f_du_no_bucket",
             )
-            du_no_range_trieu = st.slider(
-                "Khoảng dư nợ (triệu đồng)",
-                min_value=0.0,
-                max_value=_max_du_no_trieu,
-                value=safe_value_trieu,
-                step=1.0,
-                format="%,.0f",
-                key="tc_du_no",
+            _min_default = max(
+                0.0, float(st.session_state.tracuu_filters.get("du_no_min_trieu", 0.0))
             )
-            du_no_range = (
-                du_no_range_trieu[0] * 1_000_000.0,
-                du_no_range_trieu[1] * 1_000_000.0,
+            _max_default = max(
+                _min_default,
+                float(st.session_state.tracuu_filters.get("du_no_max_trieu", _max_du_no_trieu)),
+            )
+            if du_no_bucket == "Tự nhập":
+                c_min, c_max = st.columns(2)
+                with c_min:
+                    du_no_min_trieu = st.number_input(
+                        "Từ (triệu đồng)", min_value=0.0, value=_min_default,
+                        step=1.0, format="%.0f", key="tc2_f_du_no_min",
+                    )
+                with c_max:
+                    du_no_max_trieu = st.number_input(
+                        "Đến (triệu đồng)", min_value=0.0, value=_max_default,
+                        step=1.0, format="%.0f", key="tc2_f_du_no_max",
+                    )
+            else:
+                du_no_min_trieu = _min_default
+                du_no_max_trieu = _max_default
+            du_no_range = _resolve_du_no_range(
+                du_no_bucket, du_no_min_trieu, du_no_max_trieu, _max_du_no
             )
         else:
+            du_no_bucket = "Tất cả"
+            du_no_min_trieu = 0.0
+            du_no_max_trieu = 0.0
             du_no_range = (0.0, float('inf'))
         
         col_date1, col_date2 = st.columns(2)
@@ -564,14 +690,14 @@ def render_filter_panel(
                 ngay_vay_from = st.date_input(
                     "Từ ngày",
                     value=st.session_state.tracuu_filters["ngay_vay_from"],
-                    key="tc_ngay_vay_from",
+                    key="tc2_f_ngay_vay_from",
                     format="DD/MM/YYYY",
                 )
             with col_to:
                 ngay_vay_to = st.date_input(
                     "Đến ngày",
                     value=st.session_state.tracuu_filters["ngay_vay_to"],
-                    key="tc_ngay_vay_to",
+                    key="tc2_f_ngay_vay_to",
                     format="DD/MM/YYYY",
                 )
         
@@ -582,14 +708,14 @@ def render_filter_panel(
                 ngay_dh_from = st.date_input(
                     "Từ ngày",
                     value=st.session_state.tracuu_filters["ngay_dh_from"],
-                    key="tc_ngay_dh_from",
+                    key="tc2_f_ngay_dh_from",
                     format="DD/MM/YYYY",
                 )
             with col_to:
                 ngay_dh_to = st.date_input(
                     "Đến ngày",
                     value=st.session_state.tracuu_filters["ngay_dh_to"],
-                    key="tc_ngay_dh_to",
+                    key="tc2_f_ngay_dh_to",
                     format="DD/MM/YYYY",
                 )
         
@@ -600,31 +726,31 @@ def render_filter_panel(
         col_nv1, col_nv2, col_nv3 = st.columns(3)
         
         with col_nv1:
-            ds_phan_loai = _get_unique_values(df, COT_PHAN_LOAI, ts_hstd)
+            ds_phan_loai = _get_unique_values(df, COT_PHAN_LOAI, ts_hstd, _cache_scope)
             filter_phan_loai = st.multiselect(
                 "Phân loại / nhóm nợ",
                 options=ds_phan_loai,
                 default=st.session_state.tracuu_filters["filter_phan_loai"],
                 placeholder="Tất cả",
-                key="tc_phan_loai",
+                key="tc2_f_phan_loai",
             )
-            ds_dvut = _get_unique_values(df, COT_DVUT, ts_hstd)
+            ds_dvut = _get_unique_values(df, COT_DVUT, ts_hstd, _cache_scope)
             filter_dvut = st.multiselect(
                 "Hội đoàn thể",
                 options=ds_dvut,
                 default=st.session_state.tracuu_filters["filter_dvut"],
                 placeholder="Tất cả",
-                key="tc_dvut",
+                key="tc2_f_dvut",
             )
         
         with col_nv2:
-            ds_dgd = _get_unique_values(df, COT_TEN_DGD, ts_hstd)
+            ds_dgd = _get_unique_values(df, COT_TEN_DGD, ts_hstd, _cache_scope)
             filter_dgd = st.multiselect(
                 "Điểm giao dịch",
                 options=ds_dgd,
                 default=st.session_state.tracuu_filters["filter_dgd"],
                 placeholder="Tất cả",
-                key="tc_dgd",
+                key="tc2_f_dgd",
             )
             _dh_opts = [None, 7, 15, 30, 60, 90]
             _dh_cur = st.session_state.tracuu_filters.get("den_han_trong")
@@ -633,7 +759,16 @@ def render_filter_panel(
                 options=_dh_opts,
                 index=_dh_opts.index(_dh_cur) if _dh_cur in _dh_opts else 0,
                 format_func=lambda x: "Tất cả" if x is None else f"{x} ngày",
-                key="tc_den_han_trong",
+                key="tc2_f_den_han_trong",
+            )
+            qua_han_ngay = st.number_input(
+                "Đã quá hạn ít nhất (ngày)",
+                min_value=0,
+                max_value=3650,
+                value=int(st.session_state.tracuu_filters.get("qua_han_ngay", 0) or 0),
+                step=1,
+                key="tc2_f_qua_han_ngay",
+                help="0 = không áp dụng; ví dụ 30 = ngày đến hạn đã qua ít nhất 30 ngày.",
             )
         
         with col_nv3:
@@ -644,17 +779,17 @@ def render_filter_panel(
                 options=_kh_opts,
                 index=_kh_opts.index(_kh_cur) if _kh_cur in _kh_opts else 0,
                 format_func=lambda x: "Tất cả" if x is None else f"{x} ngày",
-                key="tc_khoanh_sap_hh",
+                key="tc2_f_khoanh_sap_hh",
             )
             so_du_tg_0 = st.toggle(
                 "💰 Số dư TK 105 = 0",
                 value=st.session_state.tracuu_filters["so_du_tg_0"],
-                key="tc_so_du_tg_0",
+                key="tc2_f_so_du_tg_0",
             )
             co_gia_han = st.toggle(
                 "🔁 Có gia hạn nợ",
                 value=st.session_state.tracuu_filters["co_gia_han"],
-                key="tc_co_gia_han",
+                key="tc2_f_co_gia_han",
             )
         
         st.divider()
@@ -667,31 +802,31 @@ def render_filter_panel(
             filter_qua_han = st.toggle(
                 "🔴 Chỉ hồ sơ quá hạn",
                 value=st.session_state.tracuu_filters["filter_qua_han"],
-                key="tc_qua_han",
+                key="tc2_f_qua_han",
             )
             filter_nq11 = st.toggle(
                 "✨ Chỉ hồ sơ NQ11",
                 value=st.session_state.tracuu_filters["filter_nq11"],
-                key="tc_nq11",
+                key="tc2_f_nq11",
             )
         
         with col_status2:
             filter_gqvl = st.toggle(
                 "📋 Chỉ hồ sơ GQVL",
                 value=st.session_state.tracuu_filters["filter_gqvl"],
-                key="tc_gqvl",
+                key="tc2_f_gqvl",
             )
             filter_khoanh = st.toggle(
                 "🔒 Chỉ hồ sơ khoanh nợ",
                 value=st.session_state.tracuu_filters["filter_khoanh"],
-                key="tc_khoanh",
+                key="tc2_f_khoanh",
             )
         
         # Filter actions
         st.divider()
         col_reset, col_save, col_spacer = st.columns([1, 1, 3])
         with col_reset:
-            if st.button("🔄 Đặt lại", use_container_width=True, key="tc_reset"):
+            if st.button("🔄 Đặt lại", width="stretch", key="tc2_f_reset"):
                 _reset_filter_state(pgd_user, _max_du_no)
         with col_save:
             _render_save_filter(pgd_user)
@@ -701,7 +836,7 @@ def render_filter_panel(
 
     # -- Pre-compute search text (cached, chỉ tính 1 lần) --
     _search_cols = _SEARCH_COLS
-    _search_text = _pre_compute_search_text(df, _search_cols, ts_hstd)
+    _search_text = _pre_compute_search_text(df, _search_cols, ts_hstd, _cache_scope)
 
     # 1. Keyword search (đa từ khóa AND/OR)
     if search_kw:
@@ -759,13 +894,15 @@ def render_filter_panel(
     if filter_dgd and COT_TEN_DGD in df.columns:
         mask &= df[COT_TEN_DGD].astype(str).str.strip().isin({str(v).strip() for v in filter_dgd})
 
-    if den_han_trong and COT_NGAY_DH in df.columns:
+    if (den_han_trong or qua_han_ngay) and COT_NGAY_DH in df.columns:
         _ts_dh2 = _date_series.get(COT_NGAY_DH)
         if _ts_dh2 is None:
             _ts_dh2 = pd.to_datetime(df[COT_NGAY_DH], errors="coerce")
-        _hom_nay = pd.Timestamp(date.today())
-        _han = _hom_nay + pd.Timedelta(days=int(den_han_trong))
-        mask &= (_ts_dh2 >= _hom_nay) & (_ts_dh2 <= _han)
+        mask &= _due_date_mask(
+            _ts_dh2,
+            den_han_trong=den_han_trong,
+            qua_han_ngay=int(qua_han_ngay or 0),
+        )
 
     if khoanh_sap_hh and COT_NGAY_HH_KHOANH in df.columns:
         _ts_kh = pd.to_datetime(df[COT_NGAY_HH_KHOANH], errors="coerce")
@@ -823,12 +960,16 @@ def render_filter_panel(
         "filter_phan_loai": filter_phan_loai,
         "filter_dvut": filter_dvut,
         "filter_dgd": filter_dgd,
+        "du_no_bucket": du_no_bucket,
+        "du_no_min_trieu": float(du_no_min_trieu),
+        "du_no_max_trieu": float(du_no_max_trieu),
         "du_no_range": du_no_range,
         "ngay_vay_from": ngay_vay_from,
         "ngay_vay_to": ngay_vay_to,
         "ngay_dh_from": ngay_dh_from,
         "ngay_dh_to": ngay_dh_to,
         "den_han_trong": den_han_trong,
+        "qua_han_ngay": int(qua_han_ngay or 0),
         "khoanh_sap_hh": khoanh_sap_hh,
         "so_du_tg_0": so_du_tg_0,
         "co_gia_han": co_gia_han,

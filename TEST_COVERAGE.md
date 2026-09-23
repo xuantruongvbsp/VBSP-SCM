@@ -99,7 +99,7 @@
 | `tab_khtd_giao_dc.py` | ⭐⭐⭐ TB | Logic giao/điều chỉnh KHTD | 🟠 TB |
 | `tab_tien_do.py` | ⭐⭐⭐ TB | 95 xã tracking | 🟠 TB |
 | `tab_baocao.py` | ⭐⭐⭐ TB | Xuất Excel/Word nhiều loại | 🟠 TB |
-| `tab_tracuu_v2.py` + `components/filter_panel.py` | ⭐⭐⭐ TB | Search đa từ khóa, preset cột, group KH, mask PII, lưu bộ lọc (đã có `tests/test_tracuu_search.py` — 11 test) | 🟠 TB |
+| `tab_tracuu_v2.py` + `components/filter_panel.py` | ⭐⭐⭐⭐ Khá | Search đa từ khóa, cache isolation CN/PGD, bucket dư nợ, đến hạn/quá hạn N ngày, group KH, mask PII/audit, lưu bộ lọc, sort và selection phân trang (đã có `tests/test_tracuu_search.py` — 17 test + Streamlit AppTest smoke) | 🟡 Thấp–TB |
 | `tab_upload_khnv.py` | ⭐⭐⭐ TB | Upload + merge trigger | 🟡 Thấp |
 | `tab_den_han.py` | ⭐⭐ Thấp | Filter ngày đến hạn | 🟡 Thấp |
 | `tab_canh_bao_som.py` | ⭐⭐⭐ TB | Alert logic | 🟠 TB |

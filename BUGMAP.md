@@ -5027,6 +5027,54 @@ def _to_int(val, default=0):
 
 ---
 
+### B110 — Bảng kết quả Tra cứu đổi key theo trang, mất selection state
+| | |
+|---|---|
+| **File** | `tabs/tab_tracuu_v2.py` → `render()` ~dòng 824-850 |
+| **Dấu hiệu** | Mỗi lần đổi trang bảng kết quả sinh widget key mới (`tc2_table_p1`, `tc2_table_p2`...), selection state bị mất và session_state tích lũy key rác theo số trang đã mở. |
+| **Nguyên nhân** | `st.dataframe(..., key=f"tc2_table_p{page}")` làm Streamlit xem mỗi trang là một widget khác nhau. |
+| **Fix** | Dùng key cố định `tc2_table`; lưu index tuyệt đối trong `tc2_selected_idx`; reset widget state khi trang/scope đổi và dùng `selection_default` để khôi phục đúng dòng khi quay lại trang cũ. Bổ sung cỡ trang 100/200/500, nút trước/sau và clamp trang. |
+| **Test** | Unit test `_selection_default_for_page`/`_clamp_page`; Streamlit AppTest đổi cỡ trang 100 và nhảy trang 2 hiển thị đúng 100 dòng, không exception. |
+| **Ngày fix** | 2026-09-23 |
+
+---
+
+### B111 — Cache bộ lọc dùng lẫn dữ liệu giữa CN/PGD
+| | |
+|---|---|
+| **File** | `components/filter_panel.py` → nhóm hàm cache đầu file |
+| **Dấu hiệu** | Hai DataFrame khác nhau nhưng cùng timestamp có thể nhận danh sách lựa chọn hoặc search text của lần gọi trước; kết quả tìm kiếm sai và có nguy cơ lộ metadata đơn vị khác. |
+| **Nguyên nhân** | Tham số `_df` có dấu gạch dưới nên bị loại khỏi cache key, trong khi key còn lại không chứa định danh/phạm vi nguồn dữ liệu. |
+| **Fix** | Thêm `_data_cache_scope()` tạo fingerprint theo PGD, timestamp, shape và nội dung các cột định danh; truyền scope vào toàn bộ hàm cache. Đồng thời ghép chuỗi rồi normalize một lần để giảm cold-cache. |
+| **Test** | Test hai DataFrame A/B cùng timestamp trả đúng options/search text riêng; benchmark 200k dòng: cold search ~444 ms, warm cache ~4 ms trong runtime kiểm tra. |
+| **Ngày fix** | 2026-09-23 |
+
+---
+
+### B112 — Toggle che PII không che hết bảng, Excel và audit
+| | |
+|---|---|
+| **File** | `tabs/tab_tracuu_v2.py` → `_mask_kw_for_audit()`, `_detail_dialog()`, mode Theo khách hàng |
+| **Dấu hiệu** | CMND/SĐT còn nguyên trong bảng nhóm khách hàng và Excel hồ sơ; từ khóa nhiều token chứa CCCD/SĐT bị ghi nguyên vào audit. |
+| **Nguyên nhân** | Mask chỉ áp cho export tổng; audit chỉ mask khi toàn bộ keyword là một chuỗi số. |
+| **Fix** | Mask bản sao bảng khách hàng và Excel hồ sơ; regex che mọi chuỗi số 9–12 ký tự trong keyword; audit thêm phạm vi PGD. |
+| **Test** | Unit test keyword nhiều token; Streamlit AppTest role executive xác nhận bảng khách hàng hiển thị `012******901` và `09******01`. |
+| **Ngày fix** | 2026-09-23 |
+
+---
+
+### B113 — Ghi ngược session_state sau khi tạo toggle làm tab crash
+| | |
+|---|---|
+| **File** | `tabs/tab_tracuu_v2.py` → `render()` phần toggle tất toán/PII |
+| **Dấu hiệu** | Streamlit 1.60 báo `cannot be modified after the widget ... is instantiated` ngay khi render tab. |
+| **Nguyên nhân** | Code gán lại `st.session_state[key]` ngay sau `st.toggle(..., key=key)` dù widget đã tự đồng bộ state. |
+| **Fix** | Xóa hai phép gán dư thừa; dùng trực tiếp giá trị trả về từ toggle. |
+| **Test** | Streamlit AppTest render 250 hồ sơ: 0 exception; đổi mode khách hàng/thẻ chi tiết và phân trang tiếp tục chạy bình thường. |
+| **Ngày fix** | 2026-09-23 |
+
+---
+
 Mỗi khi fix bug, copy template dưới đây và điền vào đúng mục:
 
 ```
